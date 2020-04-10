@@ -137,7 +137,7 @@ operator <(const hash_t &a, const hash_t &b)
  */
 
 ostream&
-operator <<(ostream &o, const set<int> &v)
+operator <<(ostream &o, const set<unsigned> &v)
 {
     o << "set{";
     bool first = true;
@@ -346,24 +346,6 @@ struct _scopeexithack {
     }; \
     auto __log_s = _scopeexithack<decltype(__log_f)>(__log_f);
 
-
-template<> inline void
-log_format(ostream &o, const symvector &v)
-{
-    o << v;
-}
-
-template<> inline void
-log_format(ostream &o, const vector<int> &v)
-{
-    o << "{";
-    for (size_t i = 0; i < v.size(); i++) {
-        if (i != 0) o << ", ";
-        o << v[i];
-    }
-    o << "}";
-}
-
 /* CONCURRENCY UTILS
  * =================
  */
@@ -480,8 +462,7 @@ namespace tmpdir {
     {
         return string(dirname) + "/" + to_string(suffix);
     }
-};
-
+}
 
 /* BIT UTILS
  * =========
@@ -559,24 +540,24 @@ feynman_uf(const ex &denominators, const ex &loopmom, const ex &sprules, const s
 {
     LOGME;
     ex dens = denominators.expand().subs(sprules);
-    int N = dens.nops();
-    int L = loopmom.nops();
+    unsigned N = dens.nops();
+    unsigned L = loopmom.nops();
     matrix A(L, L);
     matrix B(L, 1);
     ex C;
     assert(denominators.nops() == X.size());
-    for (int d = 0; d < N; d++) {
+    for (unsigned d = 0; d < N; d++) {
         // Decompose D_i = a_ij l_i l_j + b_ij l_i e_j + c
         ex D = dens.op(d).expand();
         matrix a(L, L);
         matrix b(L, 1);
-        for (int i = 0; i < L; i++) {
+        for (unsigned i = 0; i < L; i++) {
             // l_i^2
             a(i, i) = D.coeff(loopmom.op(i), 2);
             D -= a(i, i)*loopmom.op(i)*loopmom.op(i);
             // l_i^1
             ex ki = D.coeff(loopmom.op(i), 1);
-            for (int j = i + 1; j < L; j++) {
+            for (unsigned j = i + 1; j < L; j++) {
                 ex k = ki.coeff(loopmom.op(j), 1);
                 a(i, j) = a(j, i) = k/2;
                 D -= k*loopmom.op(i)*loopmom.op(j);
@@ -590,8 +571,8 @@ feynman_uf(const ex &denominators, const ex &loopmom, const ex &sprules, const s
     }
     ex U = A.determinant().expand();
     ex F = C*U;
-    for (int i = 0; i < L; i++)
-    for (int j = 0; j < L; j++) {
+    for (unsigned i = 0; i < L; i++)
+    for (unsigned j = 0; j < L; j++) {
         ex k = (B(i, 0)*B(j, 0)).expand().subs(sprules);
         if (!k.is_zero()) F -= adjugate(A, i, j)*k;
     }
@@ -604,7 +585,7 @@ bracket(const ex &expr, const symvector &stemset)
     LOGME;
     map<vector<int>, ex> result;
     map<ex, int, ex_is_less> sym2id;
-    for (int i = 0; i < stemset.size(); i++) {
+    for (unsigned i = 0; i < stemset.size(); i++) {
         sym2id[stemset[i]] = i;
     }
     term_iter(expr.expand(), [&](const ex &term) {
@@ -633,25 +614,24 @@ family_is_zero(const ex &G, const symvector &X)
     LOGME;
     symvector K = symbolsequence("k", X.size());
     ex eqn = G;
-    for (int i = 0; i < X.size(); i++) {
+    for (unsigned i = 0; i < X.size(); i++) {
         eqn -= K[i]*X[i]*G.diff(X[i]);
     }
     matrix eqns(0, K.size() + 1);
     for (auto &&kv : bracket(eqn, X)) {
         uint64_t sector = 0;
-        for (int i = 0; i < kv.first.size(); i++) {
+        for (unsigned i = 0; i < kv.first.size(); i++) {
             if (kv.first[i] != 0) sector |= 1ul << i;
         }
         ex c0 = kv.second;
         exvector c(K.size() + 1);
-        for (int i = 0; i < K.size(); i++) {
+        for (unsigned i = 0; i < K.size(); i++) {
             c[i] = c0.coeff(K[i]);
             c0 -= c[i]*K[i];
         }
         c[X.size()] = c0.expand();
         ((matrix_hack*)&eqns)->append_row(c);
     }
-    //logd("RANK {}, N {}", eqns.rank(), K.size());
     return eqns.rank() <= K.size();
 }
 
@@ -662,7 +642,7 @@ zero_sectors(const ex &G, const symvector &X, uint64_t cutmask)
     // Lee criterium: k_i x_i dG/dx_i == G
     symvector K = symbolsequence("k", X.size());
     ex eqn = G;
-    for (int i = 0; i < X.size(); i++) {
+    for (unsigned i = 0; i < X.size(); i++) {
         eqn -= K[i]*X[i]*G.diff(X[i]);
     }
     // Split eqn into {x1^p1 ... xn^pn} * { c0 + k1*c1 + ... + kn*cn },
@@ -670,12 +650,12 @@ zero_sectors(const ex &G, const symvector &X, uint64_t cutmask)
     vector<pair<uint64_t, exvector>> eqns;
     for (auto &&kv : bracket(eqn, X)) {
         uint64_t sector = 0;
-        for (int i = 0; i < kv.first.size(); i++) {
+        for (unsigned i = 0; i < kv.first.size(); i++) {
             if (kv.first[i] != 0) sector |= 1ul << i;
         }
         ex c0 = kv.second;
         exvector c(K.size() + 1);
-        for (int i = 0; i < K.size(); i++) {
+        for (unsigned i = 0; i < K.size(); i++) {
             c[i] = c0.coeff(K[i]);
             c0 -= c[i]*K[i];
         }
@@ -706,8 +686,8 @@ zero_sectors(const ex &G, const symvector &X, uint64_t cutmask)
                 ((matrix_hack*)&seceqns)->append_row(sc.second);
             }
         }
-        int rank = seceqns.rank();
-        int ndens = bitcount(sector);
+        unsigned rank = seceqns.rank();
+        unsigned ndens = bitcount(sector);
         if (rank <= ndens) {
             for (uint64_t s = sector; s != 0; s = (s - 1) & sector) {
                 assert(is_subsector(s, sector));
@@ -728,14 +708,14 @@ zero_sectors(const ex &G, const symvector &X, uint64_t cutmask)
 }
 
 static vector<pair<vector<int>, int>>
-subsector_bracket(const vector<pair<vector<int>, int>> &br, int nx, unsigned mask)
+subsector_bracket(const vector<pair<vector<int>, int>> &br, unsigned nx, unsigned mask)
 {
     assert((br.size() == 0) || (br[0].first.size() == nx));
     int newnx = bitcount(mask);
     vector<pair<vector<int>, int>> result;
     for (auto &&stemcoef : br) {
         vector<int> stem(newnx);
-        for (int i = 0, j = 0; i < nx; i++) {
+        for (unsigned i = 0, j = 0; i < nx; i++) {
             if (mask & (1u << i)) {
                 stem[j++] = stemcoef.first[i];
             } else {
@@ -749,9 +729,8 @@ subsector_bracket(const vector<pair<vector<int>, int>> &br, int nx, unsigned mas
 }
 
 static vector<uint8_t>
-canonical_variable_permutation(const vector<pair<vector<int>, int>> &polybr, int nx)
+canonical_variable_permutation(const vector<pair<vector<int>, int>> &polybr, unsigned nx)
 {
-    //LOGME;
     assert((polybr.size() == 0) || (polybr[0].first.size() == nx));
     // A list of stems and corresponding unique coefficient ids.
     set<int> coefset;
@@ -781,13 +760,11 @@ canonical_variable_permutation(const vector<pair<vector<int>, int>> &polybr, int
     //   connecting all copies of the same vertex;
     // - replicating an edge of color c in layer l if c&(1<<l).
     int maxedgecolor = maxexponent;
-    int nlayers = bitlength(maxedgecolor);
+    unsigned nlayers = bitlength(maxedgecolor);
     // Construct the graph.
-    //logd("constructing the graph; {} X vertices, {} term vertices,
-    //    {}+1 edge colors, {} layers", nx, polybr.size(), maxedgecolor, nlayers);
     SG_DECL(g);
     g.nv = 0; g.nde = 0;
-    int nterms = polybr.size();
+    unsigned nterms = polybr.size();
     SG_ALLOC(g, 1 + (nx + nterms)*nlayers, 32, "graph malloc");
 #define BEGIN_VERTEX g.v[g.nv] = g.nde; g.d[g.nv] = 0;
 #define ADD_EDGE(vertex) \
@@ -800,12 +777,12 @@ canonical_variable_permutation(const vector<pair<vector<int>, int>> &polybr, int
     //   BR1(1) ... BR1(L) ...
 #define VERTEX_Xil(i,l) nx*(l) + (i)
 #define VERTEX_Bkl(k,l) nx*nlayers + nlayers*(k) + (l)
-    for (int l = 0, lbit = 1; l < nlayers; l++, lbit <<= 1) {
-        for (int i = 0; i < nx; i++) {
+    for (unsigned l = 0, lbit = 1; l < nlayers; l++, lbit <<= 1) {
+        for (unsigned i = 0; i < nx; i++) {
             BEGIN_VERTEX;
             if (l > 0) { ADD_EDGE(VERTEX_Xil(i, l - 1)); }
             if (l < nlayers - 1) { ADD_EDGE(VERTEX_Xil(i, l + 1)); }
-            int k = 0;
+            unsigned k = 0;
             for (auto &&stemcoef : polybr) {
                 if (stemcoef.first[i] & lbit) {
                     ADD_EDGE(VERTEX_Bkl(k, l));
@@ -815,13 +792,13 @@ canonical_variable_permutation(const vector<pair<vector<int>, int>> &polybr, int
             END_VERTEX;
         }
     }
-    int k = 0;
+    unsigned k = 0;
     for (auto &&stemcoef : polybr) {
-        for (int l = 0, lbit = 1; l < nlayers; l++, lbit <<= 1) {
+        for (unsigned l = 0, lbit = 1; l < nlayers; l++, lbit <<= 1) {
             BEGIN_VERTEX;
             if (l > 0) { ADD_EDGE(VERTEX_Bkl(k, l - 1)); }
             if (l < nlayers - 1) { ADD_EDGE(VERTEX_Bkl(k, l + 1)); }
-            for (int i = 0; i < nx; i++) {
+            for (unsigned i = 0; i < nx; i++) {
                 if (stemcoef.first[i] & lbit) {
                     ADD_EDGE(VERTEX_Xil(i, l));
                 }
@@ -844,18 +821,18 @@ canonical_variable_permutation(const vector<pair<vector<int>, int>> &polybr, int
      *   x1(1) ... xn(1) | x1(2) ... x1(2) | ...
      *   BR1_c1(1) ... BRn_c1(1) | BR1_c2(1) ... BRn_c2(1) | ...
      */
-    for (int l = 0; l < nlayers; l++) {
+    for (unsigned l = 0; l < nlayers; l++) {
         BEGIN_PARTITION; // layer #l vertices
-        for (int i = 0; i < nx; i++) {
+        for (unsigned i = 0; i < nx; i++) {
             ADD_VERTEX(VERTEX_Xil(i, l));
         }
         END_PARTITION;
     }
-    for (int l = 0; l < nlayers; l++) {
+    for (unsigned l = 0; l < nlayers; l++) {
         // Walk coefficients in increasing order.
         for (int coef : coefset) {
             BEGIN_PARTITION; // layer #l, terms with coef #coef
-            int k = 0;
+            unsigned k = 0;
             for (auto &&stemcoef : polybr) {
                 if (stemcoef.second == coef) {
                     ADD_VERTEX(VERTEX_Bkl(k, l));
@@ -875,7 +852,7 @@ canonical_variable_permutation(const vector<pair<vector<int>, int>> &polybr, int
     SG_FREE(cg);
     SG_FREE(g);
     vector<uint8_t> result(nx);
-    for (int i = 0; i < nx; i++) {
+    for (unsigned i = 0; i < nx; i++) {
         result[i] = lab[i];
     }
     DYNFREE(lab, lab_sz);
@@ -887,27 +864,27 @@ ex
 canonical_poly(const ex &poly, symvector X, vector<int> perm)
 {
     lst sub;
-    for (int i = 0; i < X.size(); i++) {
+    for (unsigned i = 0; i < X.size(); i++) {
         sub.append(X[perm[i]] == X[i]);
     }
     return poly.subs(sub);
 }
 
 hash_t
-canonical_hash(const vector<pair<vector<int>, int>> &polybr, int nx, vector<uint8_t> perm)
+canonical_hash(const vector<pair<vector<int>, int>> &polybr, unsigned nx, vector<uint8_t> perm)
 {
     assert((polybr.size() == 0) || (polybr[0].first.size() == nx));
     vector<vector<int>> expr;
     // { 1 0 2 }  ->  x1 * x3^2  /.  x1->x2 x2->x3 x3->x1  ->  x2 x1^2  ->  { 2 1 0 }
-    for (int i = 0; i < polybr.size(); i++) {
+    for (unsigned i = 0; i < polybr.size(); i++) {
         vector<int> term(nx + 1);
-        for (int j = 0; j < nx; j++) {
+        for (unsigned j = 0; j < nx; j++) {
             term[j] = polybr[i].first[perm[j]];
         }
         term[nx] = polybr[i].second;
         expr.push_back(term);
     }
-    int nterms = expr.size();
+    unsigned nterms = expr.size();
     sort(expr.begin(), expr.end());
     blake2b_state S;
     blake2b_init(&S, sizeof(hash_t));
@@ -951,7 +928,7 @@ lincoefficients(const ex &expr, const symvector &vars)
     exvector coefs;
     coefs.reserve(vars.size() + 1);
     ex restofexpr = expr;
-    for (int i = 0; i < vars.size(); i++) {
+    for (unsigned i = 0; i < vars.size(); i++) {
         if (restofexpr.degree(vars[i]) > 1) {
             loge("lincoefficients: {} is not linear in {}", expr, vars[i]);
             exit(1);
@@ -971,14 +948,15 @@ find_momenta_map(const exvector &src, const exvector &dst, const ex &loopmom)
     assert(src.size() == dst.size());
     symvector newl = symbolsequence("$l", loopmom.nops());
     exmap newloopmommap;
-    for (int i = 0; i < loopmom.nops(); i++) {
+    for (unsigned i = 0; i < loopmom.nops(); i++) {
         newloopmommap[loopmom.op(i)] = newl[i];
     }
     vector<vector<exvector>> eqnsets;
-    for (int i = 0; i < src.size(); i++) {
+    for (unsigned i = 0; i < src.size(); i++) {
         ex eq = src[i].subs(newloopmommap) - dst[i];
         vector<exvector> eqns;
         factor_iter(factor(eq), [&](const ex &factor, int power) {
+            (void)power;
             if (is_a<numeric>(factor)) return;
             eqns.push_back(lincoefficients(factor, newl));
         });
@@ -986,8 +964,8 @@ find_momenta_map(const exvector &src, const exvector &dst, const ex &loopmom)
         eqnsets.push_back(eqns);
     }
     sort(eqnsets.begin(), eqnsets.end());
-    vector<int> eqnum(eqnsets.size());
-    int eqset = 0;
+    vector<unsigned> eqnum(eqnsets.size());
+    unsigned eqset = 0;
     stack<vspace> mxstack;
     mxstack.push(vspace(loopmom.nops() + 1));
     while (eqset < eqnsets.size()) {
@@ -997,7 +975,7 @@ find_momenta_map(const exvector &src, const exvector &dst, const ex &loopmom)
         mx.add_row(eqnsets[eqset][eqnum[eqset]]);
         mx.normalize();
         bool lastrowiszero = true;
-        for (int j = 0; j < mx.length() - 1; j++) {
+        for (unsigned j = 0; j < mx.length() - 1; j++) {
             lastrowiszero = lastrowiszero && (mx.basis_rows()(mx.dim() - 1, j).is_zero());
         }
         if (lastrowiszero) {
@@ -1027,7 +1005,7 @@ find_momenta_map(const exvector &src, const exvector &dst, const ex &loopmom)
     matrix C = matrix_cut(mx, 0, loopmom.nops(), loopmom.nops(), 1);
     matrix sol = M.inverse().mul(C).mul_scalar(-1);
     lst result;
-    for (int i = 0; i < loopmom.nops(); i++) {
+    for (unsigned i = 0; i < loopmom.nops(); i++) {
         if (!loopmom.op(i).is_equal(sol(i, 0))) {
             result.append(lst{loopmom.op(i), sol(i, 0)});
         }
@@ -1082,6 +1060,7 @@ main(int argc, char *argv[])
     std::ios_base::sync_with_stdio(false);
     cerr.unsetf(std::ios::unitbuf);
     bool SHORT = false;
+    //int LIMIT = INT_MAX;
     for (int opt; (opt = getopt(argc, argv, "hqsCVj:")) != -1;) {
         switch (opt) {
         case 'h': usage(); return 0;
@@ -1090,6 +1069,7 @@ main(int argc, char *argv[])
         case 'C': COLORS = true; break;
         case 's': SHORT = true; break;
         case 'j': JOBS = atoi(optarg); if (JOBS < 1) JOBS = 1; break;
+        //case 'l': LIMIT = atoi(optarg); if (LIMIT < 1) LIMIT = 1; break;
         default: return 1;
         }
     }
@@ -1101,7 +1081,7 @@ main(int argc, char *argv[])
         ex denominators = input.op(0);
         ex loopmomenta = input.op(1);
         ex productrules = input.op(2);
-        for (int i = 0; i < productrules.nops(); i++) {
+        for (unsigned i = 0; i < productrules.nops(); i++) {
             ex &r = productrules.let_op(i);
             r = r.op(0) == r.op(1);
         }
@@ -1116,14 +1096,14 @@ main(int argc, char *argv[])
         ex cutflags = input.op(1);
         ex loopmomenta = input.op(2);
         ex productrules = input.op(3);
-        for (int i = 0; i < productrules.nops(); i++) {
+        for (unsigned i = 0; i < productrules.nops(); i++) {
             ex &r = productrules.let_op(i);
             r = r.op(0) == r.op(1);
         }
         auto x = feynman_x(denominators.nops());
         auto uf = feynman_uf(denominators, loopmomenta, productrules, x);
         uint64_t cutmask = 0;
-        for (int i = 0; i < cutflags.nops(); i++) {
+        for (unsigned i = 0; i < cutflags.nops(); i++) {
             if (!cutflags.op(i).is_zero()) cutmask |= (1ul << i);
         }
         auto zeros = zero_sectors(uf.first + uf.second, x, cutmask);
@@ -1159,16 +1139,16 @@ main(int argc, char *argv[])
         ex families = input.op(0);
         ex loopmomenta = input.op(1);
         ex productrules = input.op(2);
-        for (int i = 0; i < productrules.nops(); i++) {
+        for (unsigned i = 0; i < productrules.nops(); i++) {
             ex &r = productrules.let_op(i);
             r = r.op(0) == r.op(1);
         }
         // Compute the set of all family sizes. We will only be
         // interested in sectors of these sizes.
-        set<int> familysizeset;
-        int maxfamilysize = 0;
+        set<unsigned> familysizeset;
+        unsigned maxfamilysize = 0;
         for (auto &&family : families) {
-            int ndens = family.nops();
+            unsigned ndens = family.nops();
             assert(ndens < 256);
             familysizeset.insert(ndens);
             maxfamilysize = max(maxfamilysize, ndens);
@@ -1183,7 +1163,7 @@ main(int argc, char *argv[])
             tmpdir::create("feynson");
         }
         FORK_BEGIN;
-            for (int fam = WORKER; fam < families.nops(); fam += JOBS) {
+            for (unsigned fam = WORKER; fam < families.nops(); fam += JOBS) {
                 logd("Preparing family {}", fam + 1);
                 auto &&family  = families[fam];
                 symvector xi(x.begin(), x.begin() + family.nops());
@@ -1212,11 +1192,11 @@ main(int argc, char *argv[])
                 }
                 f << gbrackets.size() << "\n";
                 for (auto &&famgbr : gbrackets) {
-                    int nx = families[famgbr.first].nops();
+                    unsigned nx = families[famgbr.first].nops();
                     f << " " << famgbr.first << " " << nx << " " << famgbr.second.size() << "\n";
                     for (auto &&stemcoef : famgbr.second) {
                         f << "  " << stemcoef.second;
-                        for (int i = 0; i < nx; i++) {
+                        for (unsigned i = 0; i < nx; i++) {
                             f << " " << stemcoef.first[i];
                         }
                         f << "\n";
@@ -1267,11 +1247,11 @@ main(int argc, char *argv[])
             tmpdir::remove();
         }
         // Enumerate the sectors we're interested in.
-        map<pair<int, uint64_t>, uint64_t> sector2idx;
-        for (int fam = 0; fam < families.nops(); fam++) {
+        map<pair<unsigned, uint64_t>, uint64_t> sector2idx;
+        for (unsigned fam = 0; fam < families.nops(); fam++) {
             uint64_t nsectors = 1ul << families[fam].nops();
             // TODO: these two loops waste time.
-            for (int ssize : familysizeset) {
+            for (unsigned ssize : familysizeset) {
                 for (uint64_t sec = 1; sec < nsectors; sec++) {
                     if ((bitcount(sec) == ssize)/* && !zeros[fam][sec]*/) {
                         sector2idx[make_pair(fam, sec)] = sector2idx.size();
@@ -1288,8 +1268,8 @@ main(int argc, char *argv[])
         atomic<int> *hashes_done = (atomic<int> *)shared_alloc(sizeof(atomic<int> *));
         FORK_BEGIN;
             logd("Precomputing canonical polynomials of each family");
-            for (int fam = WORKER; fam < families.nops(); fam += JOBS) {
-                int nx = families[fam].nops();
+            for (unsigned fam = WORKER; fam < families.nops(); fam += JOBS) {
+                unsigned nx = families[fam].nops();
                 uint64_t sector = (1ul << nx) - 1;
                 uint64_t idx = sector2idx[make_pair(fam, sector)];
                 assert(!hash_done[idx]);
@@ -1324,8 +1304,8 @@ main(int argc, char *argv[])
             for (; famsize != familysizeset.rend(); ) {
                 logd("Searching for symmetries of families with {} propagators", *famsize);
                 map<hash_t, pair<int, uint64_t>> hash2sector;
-                for (int fam = 0; fam < families.nops(); fam += 1) {
-                    int nx = families[fam].nops();
+                for (unsigned fam = 0; fam < families.nops(); fam += 1) {
+                    unsigned nx = families[fam].nops();
                     if (nx != *famsize) continue;
                     uint64_t sector = (1ul << nx) - 1;
                     uint64_t idx = sector2idx[make_pair(fam, sector)];
@@ -1346,7 +1326,7 @@ main(int argc, char *argv[])
                             logd("Fam {} is {}, sec {} perm: {}", fam2+1, families[fam2],
                                     sec2, vector<uint8_t>(perm2, perm2+nx));
                             exvector src, dst;
-                            for (int i = 0; i < nx; i++) {
+                            for (unsigned i = 0; i < nx; i++) {
                                 int p2i = bitposition(sec2, perm2[i]);
                                 logd("  {} == {}", families[fam][perm[i]], families[fam2][p2i]);
                                 src.push_back(families[fam][perm[i]]);
@@ -1359,14 +1339,14 @@ main(int argc, char *argv[])
                         }
                     }
                     for (auto &&famsecidx : sector2idx) {
-                        int fam2 = famsecidx.first.first;
+                        unsigned fam2 = famsecidx.first.first;
                         int sec2 = famsecidx.first.second;
                         int idx2 = famsecidx.second;
                         if (fam2 >= fam) break;
                         if (bitcount(sec2) != nx) continue;
                         if (fully_mapped[fam2]) continue;
                         if (!hash_done[idx2]) {
-                            int nx2 = families[fam2].nops();
+                            unsigned nx2 = families[fam2].nops();
                             auto br2 = subsector_bracket(gbrackets[fam2], nx2, sec2);
                             auto perm = canonical_variable_permutation(br2, nx);
                             memcpy(canonicalperms + idx2*maxfamilysize, &perm[0], nx);
@@ -1395,7 +1375,7 @@ main(int argc, char *argv[])
                             logd("Fam {} is {}, sec {} perm: {}", fam2+1, families[fam2],
                                     sec2, vector<uint8_t>(perm2, perm2+nx));
                             exvector src, dst;
-                            for (int i = 0; i < nx; i++) {
+                            for (unsigned i = 0; i < nx; i++) {
                                 int p2i = bitposition(sec2, perm2[i]);
                                 logd("  {} == {}", families[fam][perm[i]], families[fam2][p2i]);
                                 src.push_back(families[fam][perm[i]]);
@@ -1436,7 +1416,7 @@ main(int argc, char *argv[])
             tmpdir::remove();
         }
         int ndone = 0;
-        for (int i = 0; i < totalsectors; i++) {
+        for (unsigned i = 0; i < totalsectors; i++) {
             ndone += !!hash_done[i];
         }
         logd("Canonized {} sectors out of {}, {}% of hashes wasted",
@@ -1446,7 +1426,7 @@ main(int argc, char *argv[])
         shared_free(hash_done, sizeof(uint8_t) * totalsectors);
         shared_free(fully_mapped, sizeof(uint8_t) * totalsectors);
         cout << "{";
-        for (int fam = 0; fam < families.nops(); fam++) {
+        for (unsigned fam = 0; fam < families.nops(); fam++) {
             if (fam == 0) { cout << "\n "; }
             else { cout << ",\n "; }
             auto it = fam2mommap.find(fam);

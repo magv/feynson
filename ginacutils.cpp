@@ -349,11 +349,11 @@ factor_iter(const ex &e, F yield)
  * and column.
  */
 matrix
-minor(const matrix &m, int row, int col)
+minor(const matrix &m, unsigned row, unsigned col)
 {
     matrix minor(m.rows() - 1, m.cols() - 1);
-    for (int i = 0; i < m.rows()-1; i++)
-    for (int j = 0; j < m.cols()-1; j++) {
+    for (unsigned i = 0; i < m.rows()-1; i++)
+    for (unsigned j = 0; j < m.cols()-1; j++) {
         minor(i, j) = m(i < row ? i : i+1, j < col ? j : j + 1);
     }
     return minor;
@@ -366,10 +366,10 @@ adjugate(const matrix &m)
 {
     matrix cofactor(m.rows(), m.cols());
     matrix minor(m.rows() - 1, m.cols() - 1);
-    for (int i = 0; i < m.rows(); i++)
-    for (int j = 0; j < m.cols(); j++) {
-        for (int ii = 0; ii < m.rows()-1; ii++)
-        for (int jj = 0; jj < m.cols()-1; jj++) {
+    for (unsigned i = 0; i < m.rows(); i++)
+    for (unsigned j = 0; j < m.cols(); j++) {
+        for (unsigned ii = 0; ii < m.rows()-1; ii++)
+        for (unsigned jj = 0; jj < m.cols()-1; jj++) {
             minor(ii, jj) = m(ii < i ? ii : ii+1, jj < j ? jj : jj + 1);
         }
         cofactor(i, j) = (i + j) % 2 == 0 ?
@@ -381,7 +381,7 @@ adjugate(const matrix &m)
 /* Return a given cell of an adjugate matrix.
  */
 ex
-adjugate(const matrix &m, int row, int col)
+adjugate(const matrix &m, unsigned row, unsigned col)
 {
     return (row + col) % 2 == 0 ?
         minor(m, col, row).determinant() :
