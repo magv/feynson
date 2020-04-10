@@ -8,37 +8,6 @@ Ss{SYNOPSYS}
 Ss{DESCRIPTION}
 
 Ss{COMMANDS}
-    Cm{ufx} Ar{spec-file}
-        Print Feynman parametrization (U, F, X) of an integral
-        defined by a set of propagators.
-
-        The input specification file should be a list of three
-        elements: a list of all propagators (e.g. "(l1-q)^2"),
-        a list of all loop momenta (e.g. "l1"), and a list of
-        external invariant substitutions (e.g. "{q^2, 1}").
-
-        The output will be a list of three items: the U polynomial,
-        the F polynomial, and the list of Feynman parameter
-        variables.
-
-    Cm{zero-sectors} [Fl{-s}] Ar{spec-file}
-        Print a list of all zero sectors of a given integral
-        family.
-
-        The input specification file should be a list of three
-        elements: a list of all propagators (e.g. "(l1-q)^2"),
-        a list of all loop momenta (e.g. "l1"), and a list of
-        external invariant substitutions (e.g. "{q^2, 1}").
-
-        The output will be a list of topmost zero sectors, each
-        denoted by an integer s=2^{i_1-1} + ... + 2^{i_n-1},
-        where i_k are the indices of denominators that belong to
-        this sector (counting from 1).
-
-        If the Fl{-s} flag is given, the output will be shortened
-        by only listing the topmost zero sectors, such that all
-        the other zero sectors are their subsectors.
-
     Cm{symmetrize} Ar{spec-file}
         Print a list of momenta substitutions that make symmetries
         between a list of integral families explicit.
@@ -48,6 +17,46 @@ Ss{COMMANDS}
         to a reordering) if the families are isomorphic, and
         will make one a subset of the other if one family is
         isomorphic to a subsector of another family.
+
+    Cm{zero-sectors} [Fl{-s}] Ar{spec-file}
+        Print a list of all zero sectors of a given integral
+        family.
+
+        The input specification file should be a list of four
+        elements:
+        1) a list of all propagator momenta (e.g. "(l1-q)^2");
+        2) a list of cut flags, "0" for normal propagators, "1"
+           for cut propagators;
+        3) a list of all loop momenta (e.g. "l1");
+        4) and a list of external invariant substitutions (e.g.
+           "{q^2, 1}").
+
+        The output will be a list of zero sectors, each denoted
+        by an integer s=2^{i_1-1} + ... + 2^{i_n-1}, where i_k
+        are the indices of denominators that belong to this
+        sector (counting from 1).
+
+        If the Fl{-s} flag is given, the output will be shortened
+        by only listing the topmost zero sectors: all the remaining
+        zero sectors are their subsectors.
+
+        Every sector that is missing a cut propagator of its
+        supersectors will be reported as zero.
+
+    Cm{ufx} Ar{spec-file}
+        Print Feynman parametrization (U, F, X) of an integral
+        defined by a set of propagators.
+
+        The input specification file should be a list of three
+        elements:
+        1) a list of all propagators, e.g. "(l1-q)^2";
+        2) a list of all loop momenta, e.g. "l1";
+        3) and a list of external invariant substitutions, e.g.
+           "{q^2, 1}".
+
+        The output will be a list of three items: the U polynomial,
+        the F polynomial, and the list of Feynman parameter
+        variables.
 
 Ss{OPTIONS}
     Fl{-j} Ar{jobs}    Parallelize calculations using at most this many workers.
@@ -1323,7 +1332,7 @@ main(int argc, char *argv[])
                     assert(hash_done[idx]);
                     if (1) {
                         auto secit = hash2sector.find(canonicalhashes[idx]);
-                        if (secit !=  hash2sector.end()) {
+                        if (secit != hash2sector.end()) {
                             int fam2 = secit->second.first;
                             uint64_t sec2 = secit->second.second;
                             uint64_t idx2 = sector2idx[secit->second];
@@ -1357,10 +1366,8 @@ main(int argc, char *argv[])
                         if (bitcount(sec2) != nx) continue;
                         if (fully_mapped[fam2]) continue;
                         if (!hash_done[idx2]) {
-                            //logd("Must rehash family {}, sector {}, idx {}", fam2+1, sec2, idx2);
                             int nx2 = families[fam2].nops();
                             auto br2 = subsector_bracket(gbrackets[fam2], nx2, sec2);
-                            //hash_t h;
                             auto perm = canonical_variable_permutation(br2, nx);
                             memcpy(canonicalperms + idx2*maxfamilysize, &perm[0], nx);
                             hash_t h = canonical_hash(br2, nx, perm);

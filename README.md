@@ -18,39 +18,6 @@ the integrals over to an IBP relation solver.
 
 ## COMMANDS
 
-* **ufx** *spec-file*
-
-  Print Feynman parametrization (U, F, X) of an integral
-  defined by a set of propagators.
-
-  The input specification file should be a list of three
-  elements: a list of all propagators (e.g. "(l1-q)^2"),
-  a list of all loop momenta (e.g. "l1"), and a list of
-  external invariant substitutions (e.g. "{q^2, 1}").
-
-  The output will be a list of three items: the U polynomial,
-  the F polynomial, and the list of Feynman parameter
-  variables.
-
-* **zero-sectors** [-s] *spec-file*
-
-  Print a list of all zero sectors of a given integral
-  family.
-
-  The input specification file should be a list of three
-  elements: a list of all propagators (e.g. "(l1-q)^2"),
-  a list of all loop momenta (e.g. "l1"), and a list of
-  external invariant substitutions (e.g. "{q^2, 1}").
-
-  The output will be a list of topmost zero sectors, each
-  denoted by an integer s=2^{i_1-1} + ... + 2^{i_n-1},
-  where i_k are the indices of denominators that belong to
-  this sector (counting from 1).
-
-  If the -s flag is given, the output will be shortened
-  by only listing the topmost zero sectors, such that all
-  the other zero sectors are their subsectors.
-
 * **symmetrize** *spec-file*
 
   Print a list of momenta substitutions that make symmetries
@@ -61,6 +28,48 @@ the integrals over to an IBP relation solver.
   to a reordering) if the families are isomorphic, and
   will make one a subset of the other if one family is
   isomorphic to a subsector of another family.
+
+* **zero-sectors** [-s] *spec-file*
+
+  Print a list of all zero sectors of a given integral
+  family.
+
+  The input specification file should be a list of four
+  elements:
+  1) a list of all propagator momenta (e.g. "(l1-q)^2");
+  2) a list of cut flags, "0" for normal propagators, "1"
+     for cut propagators;
+  3) a list of all loop momenta (e.g. "l1");
+  4) and a list of external invariant substitutions (e.g.
+     "{q^2, 1}").
+
+  The output will be a list of zero sectors, each denoted
+  by an integer s=2^{i_1-1} + ... + 2^{i_n-1}, where i_k
+  are the indices of denominators that belong to this
+  sector (counting from 1).
+
+  If the -s flag is given, the output will be shortened
+  by only listing the topmost zero sectors: all the remaining
+  zero sectors are their subsectors.
+
+  Every sector that is missing a cut propagator of its
+  supersectors will be reported as zero.
+
+* **ufx** *spec-file*
+
+  Print Feynman parametrization (U, F, X) of an integral
+  defined by a set of propagators.
+
+  The input specification file should be a list of three
+  elements:
+  1) a list of all propagators, e.g. "(l1-q)^2";
+  2) a list of all loop momenta, e.g. "l1";
+  3) and a list of external invariant substitutions, e.g.
+     "{q^2, 1}".
+
+  The output will be a list of three items: the U polynomial,
+  the F polynomial, and the list of Feynman parameter
+  variables.
 
 ## OPTIONS
 
