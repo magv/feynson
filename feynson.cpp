@@ -3,7 +3,7 @@ Ss{NAME}
     Nm{feynson} -- a tool for Feynman integral symmetries.
 
 Ss{SYNOPSYS}
-    Nm{feynson} [options] Cm{command} Ar{args} ...
+    Nm{feynson} [Fl{options}] Cm{command} Ar{args} ...
 
 Ss{DESCRIPTION}
 
@@ -18,18 +18,27 @@ Ss{COMMANDS}
         will make one a subset of the other if one family is
         isomorphic to a subsector of another family.
 
+        The input specification file should be a list of three
+        elements:
+        1) a list of all integral families, with each family
+           being a list of propagators (e.g. Ql{(l1+l2)^2});
+        2) a list of all loop momenta;
+        3) a list of external invariant substitution rules, each
+           rule being a list of two elements: a scalar product
+           and its substitution (e.g. Ql[{q^2, 1}]).
+
     Cm{zero-sectors} [Fl{-s}] Ar{spec-file}
         Print a list of all zero sectors of a given integral
         family.
 
         The input specification file should be a list of four
         elements:
-        1) a list of all propagator momenta (e.g. "(l1-q)^2");
-        2) a list of cut flags, "0" for normal propagators, "1"
+        1) a list of all propagator momenta (e.g. Ql{(l1-q)^2});
+        2) a list of cut flags, Ql{0} for normal propagators, Ql{1}
            for cut propagators;
-        3) a list of all loop momenta (e.g. "l1");
+        3) a list of all loop momenta (e.g. Ql{l1});
         4) and a list of external invariant substitutions (e.g.
-           "{q^2, 1}").
+           Ql[{q^2, 1}]).
 
         The output will be a list of zero sectors, each denoted
         by an integer s=2^{i_1-1} + ... + 2^{i_n-1}, where i_k
@@ -49,10 +58,10 @@ Ss{COMMANDS}
 
         The input specification file should be a list of three
         elements:
-        1) a list of all propagators, e.g. "(l1-q)^2";
-        2) a list of all loop momenta, e.g. "l1";
+        1) a list of all propagators, e.g. Ql{(l1-q)^2};
+        2) a list of all loop momenta, e.g. Ql{l1};
         3) and a list of external invariant substitutions, e.g.
-           "{q^2, 1}".
+           Ql[{q^2, 1}].
 
         The output will be a list of three items: the U polynomial,
         the F polynomial, and the list of Feynman parameter
@@ -66,7 +75,7 @@ Ss{OPTIONS}
     Fl{-V}         Print version information.
 
 Ss{ARGUMENTS}
-    Ar{spec-file}  Filename of the input file, with "-" meaning the standard input.
+    Ar{spec-file}  Filename of the input file, with Ql{-} meaning the standard input.
 
 Ss{ENVIRONMENT}
     Ev{TMPDIR}     Temporary files will be created here.
@@ -379,14 +388,15 @@ shared_free(void *memory, size_t size)
  * Usage:
  *   FORK_BEGIN
  *      Worker code.
- *      Use WORKER (between 0 and JOBS-1) to determine which
- *      worker are you in.
- *      If FORK (equal to JOBS==1) is true, no fork will be done,
- *      and the worker code was executed in the main process.
+ *      Use WORKER variable (an int between 0 and JOBS-1) to
+ *      determine which worker are you in.
+ *      If FORK is false (or, equivalently, JOBS is 1), then no
+ *      fork is done, and the worker code is executed in the
+ *      main process.
  *   FORK_END
  *   Main process code (all the workes have joined at this point).
  *
- * Note: we must use fork-join in stead of threads or OpenMP
+ * Note: we must use fork-join instead of threads or OpenMP
  * because GiNaC is not thread-safe.
  */
 
@@ -1021,9 +1031,11 @@ usage()
 {
     const char *p = strchr(usagetext, '\n') + 1;
     for (;;) {
-        const char *l = strchr(p + 2, '{');
-        if (l == NULL) break;
-        const char *r = strchr(l, '}');
+        const char *l1 = strchr(p + 2, '{');
+        const char *l2 = strchr(p + 2, '[');
+        if ((l1 == NULL) && (l2 == NULL)) break;
+        const char *l = l1 == NULL ? l2 : l2 == NULL ? l1 : l1 < l2 ? l1 : l2;
+        const char *r = strchr(l, (*l == '{') ? '}' : ']');
         if (r == NULL) break;
         const char *a = "", *b = "\033[0m";
         if (l[-2] == 'S' && l[-1] == 's') { a = "\033[1m"; goto found; }
@@ -1032,6 +1044,7 @@ usage()
         if (l[-2] == 'C' && l[-1] == 'm') { a = "\033[1m"; goto found; }
         if (l[-2] == 'A' && l[-1] == 'r') { a = "\033[32m"; goto found; }
         if (l[-2] == 'E' && l[-1] == 'v') { a = "\033[34m"; goto found; }
+        if (l[-2] == 'Q' && l[-1] == 'l') { a = "\033[35m"; goto found; }
         cout.write(p, r + 1 -p);
         p = r + 1;
         continue;
@@ -1043,6 +1056,385 @@ found:
         p = r + 1;
     }
     cout << p;
+}
+
+void
+main_ufx(const char *specfile)
+{
+    parser reader;
+    ex input = readfile(specfile, reader);
+    ex denominators = input.op(0);
+    ex loopmomenta = input.op(1);
+    ex productrules = input.op(2);
+    for (unsigned i = 0; i < productrules.nops(); i++) {
+        ex &r = productrules.let_op(i);
+        r = r.op(0) == r.op(1);
+    }
+    auto x = feynman_x(denominators.nops());
+    auto uf = feynman_uf(denominators, loopmomenta, productrules, x);
+    cout << "{\n " << uf.first << ",\n " << uf.second << ",\n " << x << "\n}" << endl;
+}
+
+void
+main_zerosectors(const char *specfile, bool SHORT)
+{
+    parser reader;
+    ex input = readfile(specfile, reader);
+    ex denominators = input.op(0);
+    ex cutflags = input.op(1);
+    ex loopmomenta = input.op(2);
+    ex productrules = input.op(3);
+    for (unsigned i = 0; i < productrules.nops(); i++) {
+        ex &r = productrules.let_op(i);
+        r = r.op(0) == r.op(1);
+    }
+    auto x = feynman_x(denominators.nops());
+    auto uf = feynman_uf(denominators, loopmomenta, productrules, x);
+    uint64_t cutmask = 0;
+    for (unsigned i = 0; i < cutflags.nops(); i++) {
+        if (!cutflags.op(i).is_zero()) cutmask |= (1ul << i);
+    }
+    auto zeros = zero_sectors(uf.first + uf.second, x, cutmask);
+    if (SHORT) {
+        // Only keep the topmost-level sectors; hide all zero
+        // sectors that are subsectors of other zero sectors.
+        for (uint64_t sec = 0; sec < zeros.size(); sec++) {
+            if (zeros[sec]) {
+                for (uint64_t s = (sec - 1) & sec; s > 0; s = (s - 1) & sec) {
+                    zeros[s] = false;
+                }
+                zeros[0] = false;
+            }
+        }
+    }
+    cout << "{";
+    bool first = true;
+    for (uint64_t sec = 0; sec < zeros.size(); sec++) {
+        if (zeros[sec]) {
+            if (first) {
+                cout << "\n " << sec;
+                first = false;
+            } else {
+                cout << ",\n " << sec;
+            }
+        }
+    }
+    cout << "\n}" << endl;
+}
+
+void
+main_symmetrize(const char *specfile)
+{
+    parser reader;
+    ex input = readfile(specfile, reader);
+    ex families = input.op(0);
+    ex loopmomenta = input.op(1);
+    ex productrules = input.op(2);
+    for (unsigned i = 0; i < productrules.nops(); i++) {
+        ex &r = productrules.let_op(i);
+        r = r.op(0) == r.op(1);
+    }
+    // Compute the set of all family sizes. We will only be
+    // interested in sectors of these sizes.
+    set<unsigned> familysizeset;
+    unsigned maxfamilysize = 0;
+    for (auto &&family : families) {
+        unsigned ndens = family.nops();
+        assert(ndens < 256);
+        familysizeset.insert(ndens);
+        maxfamilysize = max(maxfamilysize, ndens);
+    }
+    logd("Family size set: {}", familysizeset);
+    // Compute G polynomials, their brackets, and the zero
+    // sectors for each family.
+    symvector x = feynman_x(maxfamilysize);
+    map<ex, int, ex_is_less> coef2uniqid;
+    map<int, vector<pair<vector<int>, int>>> gbrackets;
+    if (FORK) {
+        tmpdir::create("feynson");
+    }
+    FORK_BEGIN;
+        for (unsigned fam = WORKER; fam < families.nops(); fam += JOBS) {
+            logd("Preparing family {}", fam + 1);
+            auto &&family  = families[fam];
+            symvector xi(x.begin(), x.begin() + family.nops());
+            auto uf = feynman_uf(family, loopmomenta, productrules, xi);
+            auto g = uf.first + uf.second;
+            auto br = bracket(g, xi);
+            for (auto &&stemcoef : br) {
+                auto &&it = coef2uniqid.find(stemcoef.second);
+                if (it == coef2uniqid.end()) {
+                    logd("Unique coefficient C{} = {}", coef2uniqid.size(), stemcoef.second);
+                    coef2uniqid[stemcoef.second] = coef2uniqid.size();
+                }
+            }
+            vector<pair<vector<int>, int>> gbr;
+            for (auto &&stemcoef : br) {
+                gbr.push_back(make_pair(stemcoef.first, coef2uniqid[stemcoef.second]));
+            }
+            gbrackets[fam] = gbr;
+        }
+        if (FORK) {
+            logd("Exporting results");
+            ofstream f(tmpdir::filename(WORKER));
+            f << coef2uniqid.size() << "\n";
+            for (auto &&coefid : coef2uniqid) {
+                f << " " << coefid.second << " " << coefid.first << "\n";
+            }
+            f << gbrackets.size() << "\n";
+            for (auto &&famgbr : gbrackets) {
+                unsigned nx = families[famgbr.first].nops();
+                f << " " << famgbr.first << " " << nx << " " << famgbr.second.size() << "\n";
+                for (auto &&stemcoef : famgbr.second) {
+                    f << "  " << stemcoef.second;
+                    for (unsigned i = 0; i < nx; i++) {
+                        f << " " << stemcoef.first[i];
+                    }
+                    f << "\n";
+                }
+            }
+            logd("Export done");
+        }
+    FORK_END;
+    if (FORK) {
+        logd("Loading & combining worker outputs");
+        for (int worker = 0; worker < JOBS; worker++) {
+            ifstream f(tmpdir::filename(worker));
+            int nc; f >> nc;
+            map<int, int> cidmap;
+            for (int i = 0; i < nc; i++) {
+                int id; f >> id;
+                string line; f >> ws; getline(f, line);
+                ex coef = reader(line);
+                auto it = coef2uniqid.find(coef);
+                if (it == coef2uniqid.end()) {
+                    logd("Unique coefficient C{} = W{}.C{} = {}",
+                            coef2uniqid.size(), worker, id, coef);
+                    coef2uniqid[coef] = cidmap[id] = coef2uniqid.size();
+                } else {
+                    logd("Known coefficient C{} = W{}.C{} = ", it->second, worker, id, coef);
+                    cidmap[id] = it->second;
+                }
+            }
+            int nfam; f >> nfam;
+            for (int i = 0; i < nfam; i++) {
+                int fam; f >> fam;
+                int nx; f >> nx;
+                int nterms; f >> nterms;
+                vector<pair<vector<int>, int>> br;
+                for (int t = 0; t < nterms; t++) {
+                    int coefid; f >> coefid;
+                    vector<int> stem(nx);
+                    for (int x = 0; x < nx; x++) {
+                        int p; f >> p;
+                        stem[x] = p;
+                    }
+                    br.push_back(make_pair(stem, cidmap[coefid]));
+                }
+                gbrackets[fam] = br;
+            }
+        }
+        logd("Done combining output");
+        tmpdir::remove();
+    }
+    // Enumerate the sectors we're interested in.
+    map<pair<unsigned, uint64_t>, uint64_t> sector2idx;
+    for (unsigned fam = 0; fam < families.nops(); fam++) {
+        uint64_t nsectors = 1ul << families[fam].nops();
+        // TODO: these two loops waste time.
+        for (unsigned ssize : familysizeset) {
+            for (uint64_t sec = 1; sec < nsectors; sec++) {
+                if ((bitcount(sec) == ssize)/* && !zeros[fam][sec]*/) {
+                    sector2idx[make_pair(fam, sec)] = sector2idx.size();
+                }
+            }
+        }
+    }
+    // Compute canonical permutations and hashes for top-level
+    // sectors (those with largest number of propagators).
+    uint64_t totalsectors = sector2idx.size();
+    logd("Total interesting sectors: {}", sector2idx.size());
+    hash_t *canonicalhashes = (hash_t*)shared_alloc(sizeof(hash_t) * totalsectors);
+    uint8_t *canonicalperms = (uint8_t*)shared_alloc(maxfamilysize * sizeof(uint8_t) * totalsectors);
+    uint8_t *hash_done = (uint8_t*)shared_alloc(sizeof(uint8_t) * totalsectors);
+    uint8_t *fully_mapped = (uint8_t*)shared_alloc(sizeof(uint8_t) * totalsectors);
+    atomic<int> *hashes_done = (atomic<int> *)shared_alloc(sizeof(atomic<int> *));
+    FORK_BEGIN;
+        logd("Precomputing canonical polynomials of each family");
+        for (unsigned fam = WORKER; fam < families.nops(); fam += JOBS) {
+            unsigned nx = families[fam].nops();
+            uint64_t sector = (1ul << nx) - 1;
+            uint64_t idx = sector2idx[make_pair(fam, sector)];
+            assert(!hash_done[idx]);
+            auto perm = canonical_variable_permutation(gbrackets[fam], nx);
+            memcpy(canonicalperms + idx*maxfamilysize, &perm[0], nx);
+            hash_t h = canonical_hash(gbrackets[fam], nx, perm);
+            canonicalhashes[idx] = h;
+            // "Release"-ordered fence. This prevents any preceding
+            // reads or writes from being ordered past
+            // any subsequent writes.
+            // We need this so that any thread observing
+            // hash_done to be 1 would also observe
+            // canonicalhashes to be of correct value.
+            // On x86 this is only an instruction for the
+            // compiler not to reorder memory access across
+            // this line; the hardware does not do this sort
+            // of memory reordering.
+            atomic_thread_fence(memory_order_release);
+            hash_done[idx] = true;
+            hashes_done->fetch_add(1, memory_order_relaxed);
+            logd("Family {}, sector {} is {}", fam+1, sector, h);
+        }
+    FORK_END;
+    // Wait for all top-level hashes to finish; then, for
+    // each sector size walk through each sub-sector of
+    // each family in order, compute and remember hashes of
+    // their canonical polys, noting any duplicates along
+    // the way.
+    map<int, string> fam2mommap;
+    if (FORK) {
+        tmpdir::create("feynson");
+    }
+    FORK_BEGIN;
+        // Pair each worker with its own set of family sizes.
+        auto famsize = familysizeset.rbegin();
+        for (int i = 0 ; (i < WORKER) && (famsize != familysizeset.rend()); i++, famsize++);
+        for (; famsize != familysizeset.rend(); ) {
+            logd("Searching for symmetries of families with {} propagators", *famsize);
+            map<hash_t, pair<int, uint64_t>> hash2sector;
+            for (unsigned fam = 0; fam < families.nops(); fam += 1) {
+                unsigned nx = families[fam].nops();
+                if (nx != *famsize) continue;
+                uint64_t sector = (1ul << nx) - 1;
+                uint64_t idx = sector2idx[make_pair(fam, sector)];
+                assert(hash_done[idx]);
+                if (1) {
+                    auto secit = hash2sector.find(canonicalhashes[idx]);
+                    if (secit != hash2sector.end()) {
+                        int fam2 = secit->second.first;
+                        uint64_t sec2 = secit->second.second;
+                        uint64_t idx2 = sector2idx[secit->second];
+                        fully_mapped[fam] = true;
+                        logi("Family {} (top sector {}) is symmetric to family {}, sector {}",
+                                fam+1, sector, fam2+1, sec2);
+                        uint8_t *perm = canonicalperms + idx*maxfamilysize;
+                        uint8_t *perm2 = canonicalperms + idx2*maxfamilysize;
+                        logd("Fam {} is {}, sec {} perm: {}", fam+1, families[fam],
+                                sector, vector<uint8_t>(perm, perm+nx));
+                        logd("Fam {} is {}, sec {} perm: {}", fam2+1, families[fam2],
+                                sec2, vector<uint8_t>(perm2, perm2+nx));
+                        exvector src, dst;
+                        for (unsigned i = 0; i < nx; i++) {
+                            int p2i = bitposition(sec2, perm2[i]);
+                            logd("  {} == {}", families[fam][perm[i]], families[fam2][p2i]);
+                            src.push_back(families[fam][perm[i]]);
+                            dst.push_back(families[fam2][p2i]);
+                        }
+                        auto mommap = find_momenta_map(src, dst, loopmomenta);
+                        logd("Mom map: {}", mommap);
+                        fam2mommap[fam] = to_string(mommap);
+                        goto found;
+                    }
+                }
+                for (auto &&famsecidx : sector2idx) {
+                    unsigned fam2 = famsecidx.first.first;
+                    int sec2 = famsecidx.first.second;
+                    int idx2 = famsecidx.second;
+                    if (fam2 >= fam) break;
+                    if (bitcount(sec2) != nx) continue;
+                    if (fully_mapped[fam2]) continue;
+                    if (!hash_done[idx2]) {
+                        unsigned nx2 = families[fam2].nops();
+                        auto br2 = subsector_bracket(gbrackets[fam2], nx2, sec2);
+                        auto perm = canonical_variable_permutation(br2, nx);
+                        memcpy(canonicalperms + idx2*maxfamilysize, &perm[0], nx);
+                        hash_t h = canonical_hash(br2, nx, perm);
+                        canonicalhashes[idx2] = h;
+                        atomic_thread_fence(memory_order_release);
+                        hash_done[idx2] = true;
+                        hashes_done->fetch_add(1, memory_order_relaxed);
+                        logd("Sector {}:{} is {}", fam2+1, sec2, h);
+                    }
+                    // "Acquire"-ordered memory fence. This prevents
+                    // any following reads or writes to be ordered
+                    // before any preceeding reads.
+                    // We need this here so that the following reads from
+                    // canonicalhashes would not be reordered before the
+                    // read of hash_done above -- unlikely as it is.
+                    atomic_thread_fence(memory_order_acquire);
+                    if (canonicalhashes[idx] == canonicalhashes[idx2]) {
+                        fully_mapped[fam] = true;
+                        logi("Family {} (top sector {}) is symmetric to family {}, sector {}",
+                                fam+1, sector, fam2+1, sec2);
+                        uint8_t *perm = canonicalperms + idx*maxfamilysize;
+                        uint8_t *perm2 = canonicalperms + idx2*maxfamilysize;
+                        logd("Fam {} is {}, sec {} perm: {}", fam+1, families[fam],
+                                sector, vector<uint8_t>(perm, perm+nx));
+                        logd("Fam {} is {}, sec {} perm: {}", fam2+1, families[fam2],
+                                sec2, vector<uint8_t>(perm2, perm2+nx));
+                        exvector src, dst;
+                        for (unsigned i = 0; i < nx; i++) {
+                            int p2i = bitposition(sec2, perm2[i]);
+                            logd("  {} == {}", families[fam][perm[i]], families[fam2][p2i]);
+                            src.push_back(families[fam][perm[i]]);
+                            dst.push_back(families[fam2][p2i]);
+                        }
+                        auto mommap = find_momenta_map(src, dst, loopmomenta);
+                        logd("Mom map: {}", mommap);
+                        fam2mommap[fam] = to_string(mommap);
+                        goto found;
+                    }
+                }
+                logi("Family {} (top sector {}) is unique", fam+1, sector);
+                hash2sector[canonicalhashes[idx]] = make_pair(fam, sector);
+            found:;
+            }
+            for (int i = 0 ; (i < JOBS) && (famsize != familysizeset.rend()); i++, famsize++);
+        }
+        if (FORK) {
+            logd("Exporting results");
+            ofstream f(tmpdir::filename(WORKER));
+            f << fam2mommap.size() << "\n";
+            for (auto &&fammap: fam2mommap) {
+                f << fammap.first << " " << fammap.second << "\n";
+            }
+        }
+    FORK_END;
+    if (FORK) {
+        logd("Importing worker results");
+        for (int worker = 0; worker < JOBS; worker++) {
+            ifstream f(tmpdir::filename(worker));
+            int nentries; f >> nentries;
+            for (int i = 0; i < nentries; i++) {
+                int fam; f >> fam;
+                string line; f >> ws; getline(f, line);
+                fam2mommap[fam] = line;
+            }
+        }
+        tmpdir::remove();
+    }
+    int ndone = 0;
+    for (unsigned i = 0; i < totalsectors; i++) {
+        ndone += !!hash_done[i];
+    }
+    logd("Canonized {} sectors out of {}, {}% of hashes wasted",
+        ndone, totalsectors, (hashes_done->load() - ndone)*100/(hashes_done->load()));
+    shared_free(canonicalperms, maxfamilysize * sizeof(uint8_t) * totalsectors);
+    shared_free(canonicalhashes, sizeof(hash_t) * totalsectors);
+    shared_free(hash_done, sizeof(uint8_t) * totalsectors);
+    shared_free(fully_mapped, sizeof(uint8_t) * totalsectors);
+    cout << "{";
+    for (unsigned fam = 0; fam < families.nops(); fam++) {
+        if (fam == 0) { cout << "\n "; }
+        else { cout << ",\n "; }
+        auto it = fam2mommap.find(fam);
+        if (it != fam2mommap.end()) {
+            cout << it->second;
+        } else {
+            cout << "{}";
+        }
+    }
+    cout << "\n}\n";
 }
 
 #define IFCMD(name, condition) \
@@ -1060,7 +1452,6 @@ main(int argc, char *argv[])
     std::ios_base::sync_with_stdio(false);
     cerr.unsetf(std::ios::unitbuf);
     bool SHORT = false;
-    //int LIMIT = INT_MAX;
     for (int opt; (opt = getopt(argc, argv, "hqsCVj:")) != -1;) {
         switch (opt) {
         case 'h': usage(); return 0;
@@ -1069,374 +1460,19 @@ main(int argc, char *argv[])
         case 'C': COLORS = true; break;
         case 's': SHORT = true; break;
         case 'j': JOBS = atoi(optarg); if (JOBS < 1) JOBS = 1; break;
-        //case 'l': LIMIT = atoi(optarg); if (LIMIT < 1) LIMIT = 1; break;
         default: return 1;
         }
     }
     argc -= optind;
     argv += optind;
     IFCMD("ufx", argc == 2) {
-        parser reader;
-        ex input = readfile(argv[1], reader);
-        ex denominators = input.op(0);
-        ex loopmomenta = input.op(1);
-        ex productrules = input.op(2);
-        for (unsigned i = 0; i < productrules.nops(); i++) {
-            ex &r = productrules.let_op(i);
-            r = r.op(0) == r.op(1);
-        }
-        auto x = feynman_x(denominators.nops());
-        auto uf = feynman_uf(denominators, loopmomenta, productrules, x);
-        cout << "{\n " << uf.first << ",\n " << uf.second << ",\n " << x << "\n}" << endl;
+        main_ufx(argv[1]);
     }
     else IFCMD("zero-sectors", argc == 2) {
-        parser reader;
-        ex input = readfile(argv[1], reader);
-        ex denominators = input.op(0);
-        ex cutflags = input.op(1);
-        ex loopmomenta = input.op(2);
-        ex productrules = input.op(3);
-        for (unsigned i = 0; i < productrules.nops(); i++) {
-            ex &r = productrules.let_op(i);
-            r = r.op(0) == r.op(1);
-        }
-        auto x = feynman_x(denominators.nops());
-        auto uf = feynman_uf(denominators, loopmomenta, productrules, x);
-        uint64_t cutmask = 0;
-        for (unsigned i = 0; i < cutflags.nops(); i++) {
-            if (!cutflags.op(i).is_zero()) cutmask |= (1ul << i);
-        }
-        auto zeros = zero_sectors(uf.first + uf.second, x, cutmask);
-        if (SHORT) {
-            // Only keep the topmost-level sectors; hide all zero
-            // sectors that are subsectors of other zero sectors.
-            for (uint64_t sec = 0; sec < zeros.size(); sec++) {
-                if (zeros[sec]) {
-                    for (uint64_t s = (sec - 1) & sec; s > 0; s = (s - 1) & sec) {
-                        zeros[s] = false;
-                    }
-                    zeros[0] = false;
-                }
-            }
-        }
-        cout << "{";
-        bool first = true;
-        for (uint64_t sec = 0; sec < zeros.size(); sec++) {
-            if (zeros[sec]) {
-                if (first) {
-                    cout << "\n " << sec;
-                    first = false;
-                } else {
-                    cout << ",\n " << sec;
-                }
-            }
-        }
-        cout << "\n}" << endl;
+        main_zerosectors(argv[1], SHORT);
     }
     else IFCMD("symmetrize", argc == 2) {
-        parser reader;
-        ex input = readfile(argv[1], reader);
-        ex families = input.op(0);
-        ex loopmomenta = input.op(1);
-        ex productrules = input.op(2);
-        for (unsigned i = 0; i < productrules.nops(); i++) {
-            ex &r = productrules.let_op(i);
-            r = r.op(0) == r.op(1);
-        }
-        // Compute the set of all family sizes. We will only be
-        // interested in sectors of these sizes.
-        set<unsigned> familysizeset;
-        unsigned maxfamilysize = 0;
-        for (auto &&family : families) {
-            unsigned ndens = family.nops();
-            assert(ndens < 256);
-            familysizeset.insert(ndens);
-            maxfamilysize = max(maxfamilysize, ndens);
-        }
-        logd("Family size set: {}", familysizeset);
-        // Compute G polynomials, their brackets, and the zero
-        // sectors for each family.
-        symvector x = feynman_x(maxfamilysize);
-        map<ex, int, ex_is_less> coef2uniqid;
-        map<int, vector<pair<vector<int>, int>>> gbrackets;
-        if (FORK) {
-            tmpdir::create("feynson");
-        }
-        FORK_BEGIN;
-            for (unsigned fam = WORKER; fam < families.nops(); fam += JOBS) {
-                logd("Preparing family {}", fam + 1);
-                auto &&family  = families[fam];
-                symvector xi(x.begin(), x.begin() + family.nops());
-                auto uf = feynman_uf(family, loopmomenta, productrules, xi);
-                auto g = uf.first + uf.second;
-                auto br = bracket(g, xi);
-                for (auto &&stemcoef : br) {
-                    auto &&it = coef2uniqid.find(stemcoef.second);
-                    if (it == coef2uniqid.end()) {
-                        logd("Unique coefficient C{} = {}", coef2uniqid.size(), stemcoef.second);
-                        coef2uniqid[stemcoef.second] = coef2uniqid.size();
-                    }
-                }
-                vector<pair<vector<int>, int>> gbr;
-                for (auto &&stemcoef : br) {
-                    gbr.push_back(make_pair(stemcoef.first, coef2uniqid[stemcoef.second]));
-                }
-                gbrackets[fam] = gbr;
-            }
-            if (FORK) {
-                logd("Exporting results");
-                ofstream f(tmpdir::filename(WORKER));
-                f << coef2uniqid.size() << "\n";
-                for (auto &&coefid : coef2uniqid) {
-                    f << " " << coefid.second << " " << coefid.first << "\n";
-                }
-                f << gbrackets.size() << "\n";
-                for (auto &&famgbr : gbrackets) {
-                    unsigned nx = families[famgbr.first].nops();
-                    f << " " << famgbr.first << " " << nx << " " << famgbr.second.size() << "\n";
-                    for (auto &&stemcoef : famgbr.second) {
-                        f << "  " << stemcoef.second;
-                        for (unsigned i = 0; i < nx; i++) {
-                            f << " " << stemcoef.first[i];
-                        }
-                        f << "\n";
-                    }
-                }
-                logd("Export done");
-            }
-        FORK_END;
-        if (FORK) {
-            logd("Loading & combining worker outputs");
-            for (int worker = 0; worker < JOBS; worker++) {
-                ifstream f(tmpdir::filename(worker));
-                int nc; f >> nc;
-                map<int, int> cidmap;
-                for (int i = 0; i < nc; i++) {
-                    int id; f >> id;
-                    string line; f >> ws; getline(f, line);
-                    ex coef = reader(line);
-                    auto it = coef2uniqid.find(coef);
-                    if (it == coef2uniqid.end()) {
-                        logd("Unique coefficient C{} = W{}.C{} = {}",
-                                coef2uniqid.size(), worker, id, coef);
-                        coef2uniqid[coef] = cidmap[id] = coef2uniqid.size();
-                    } else {
-                        logd("Known coefficient C{} = W{}.C{} = ", it->second, worker, id, coef);
-                        cidmap[id] = it->second;
-                    }
-                }
-                int nfam; f >> nfam;
-                for (int i = 0; i < nfam; i++) {
-                    int fam; f >> fam;
-                    int nx; f >> nx;
-                    int nterms; f >> nterms;
-                    vector<pair<vector<int>, int>> br;
-                    for (int t = 0; t < nterms; t++) {
-                        int coefid; f >> coefid;
-                        vector<int> stem(nx);
-                        for (int x = 0; x < nx; x++) {
-                            int p; f >> p;
-                            stem[x] = p;
-                        }
-                        br.push_back(make_pair(stem, cidmap[coefid]));
-                    }
-                    gbrackets[fam] = br;
-                }
-            }
-            logd("Done combining output");
-            tmpdir::remove();
-        }
-        // Enumerate the sectors we're interested in.
-        map<pair<unsigned, uint64_t>, uint64_t> sector2idx;
-        for (unsigned fam = 0; fam < families.nops(); fam++) {
-            uint64_t nsectors = 1ul << families[fam].nops();
-            // TODO: these two loops waste time.
-            for (unsigned ssize : familysizeset) {
-                for (uint64_t sec = 1; sec < nsectors; sec++) {
-                    if ((bitcount(sec) == ssize)/* && !zeros[fam][sec]*/) {
-                        sector2idx[make_pair(fam, sec)] = sector2idx.size();
-                    }
-                }
-            }
-        }
-        uint64_t totalsectors = sector2idx.size();
-        logd("Total interesting sectors: {}", sector2idx.size());
-        hash_t *canonicalhashes = (hash_t*)shared_alloc(sizeof(hash_t) * totalsectors);
-        uint8_t *canonicalperms = (uint8_t*)shared_alloc(maxfamilysize * sizeof(uint8_t) * totalsectors);
-        uint8_t *hash_done = (uint8_t*)shared_alloc(sizeof(uint8_t) * totalsectors);
-        uint8_t *fully_mapped = (uint8_t*)shared_alloc(sizeof(uint8_t) * totalsectors);
-        atomic<int> *hashes_done = (atomic<int> *)shared_alloc(sizeof(atomic<int> *));
-        FORK_BEGIN;
-            logd("Precomputing canonical polynomials of each family");
-            for (unsigned fam = WORKER; fam < families.nops(); fam += JOBS) {
-                unsigned nx = families[fam].nops();
-                uint64_t sector = (1ul << nx) - 1;
-                uint64_t idx = sector2idx[make_pair(fam, sector)];
-                assert(!hash_done[idx]);
-                auto perm = canonical_variable_permutation(gbrackets[fam], nx);
-                memcpy(canonicalperms + idx*maxfamilysize, &perm[0], nx);
-                hash_t h = canonical_hash(gbrackets[fam], nx, perm);
-                canonicalhashes[idx] = h;
-                // "Release"-ordered fence. This prevents any preceding
-                // reads or writes from being ordered past
-                // any subsequent writes.
-                // We need this so that any thread observing
-                // hash_done to be 1 would also observe
-                // canonicalhashes to be of correct value.
-                // On x86 this is only an instruction for the
-                // compiler not to reorder memort access across
-                // this line; the hardware does not do this sort
-                // of memory reordering.
-                atomic_thread_fence(memory_order_release);
-                hash_done[idx] = true;
-                hashes_done->fetch_add(1, memory_order_relaxed);
-                logd("Family {}, sector {} is {}", fam+1, sector, h);
-            }
-        FORK_END;
-        // Wait for all top-level hashes to finish.
-        map<int, string> fam2mommap;
-        if (FORK) {
-            tmpdir::create("feynson");
-        }
-        FORK_BEGIN;
-            auto famsize = familysizeset.rbegin();
-            for (int i = 0 ; (i < WORKER) && (famsize != familysizeset.rend()); i++, famsize++);
-            for (; famsize != familysizeset.rend(); ) {
-                logd("Searching for symmetries of families with {} propagators", *famsize);
-                map<hash_t, pair<int, uint64_t>> hash2sector;
-                for (unsigned fam = 0; fam < families.nops(); fam += 1) {
-                    unsigned nx = families[fam].nops();
-                    if (nx != *famsize) continue;
-                    uint64_t sector = (1ul << nx) - 1;
-                    uint64_t idx = sector2idx[make_pair(fam, sector)];
-                    assert(hash_done[idx]);
-                    if (1) {
-                        auto secit = hash2sector.find(canonicalhashes[idx]);
-                        if (secit != hash2sector.end()) {
-                            int fam2 = secit->second.first;
-                            uint64_t sec2 = secit->second.second;
-                            uint64_t idx2 = sector2idx[secit->second];
-                            fully_mapped[fam] = true;
-                            logi("Family {} (top sector {}) is symmetric to family {}, sector {}",
-                                    fam+1, sector, fam2+1, sec2);
-                            uint8_t *perm = canonicalperms + idx*maxfamilysize;
-                            uint8_t *perm2 = canonicalperms + idx2*maxfamilysize;
-                            logd("Fam {} is {}, sec {} perm: {}", fam+1, families[fam],
-                                    sector, vector<uint8_t>(perm, perm+nx));
-                            logd("Fam {} is {}, sec {} perm: {}", fam2+1, families[fam2],
-                                    sec2, vector<uint8_t>(perm2, perm2+nx));
-                            exvector src, dst;
-                            for (unsigned i = 0; i < nx; i++) {
-                                int p2i = bitposition(sec2, perm2[i]);
-                                logd("  {} == {}", families[fam][perm[i]], families[fam2][p2i]);
-                                src.push_back(families[fam][perm[i]]);
-                                dst.push_back(families[fam2][p2i]);
-                            }
-                            auto mommap = find_momenta_map(src, dst, loopmomenta);
-                            logd("Mom map: {}", mommap);
-                            fam2mommap[fam] = to_string(mommap);
-                            goto found;
-                        }
-                    }
-                    for (auto &&famsecidx : sector2idx) {
-                        unsigned fam2 = famsecidx.first.first;
-                        int sec2 = famsecidx.first.second;
-                        int idx2 = famsecidx.second;
-                        if (fam2 >= fam) break;
-                        if (bitcount(sec2) != nx) continue;
-                        if (fully_mapped[fam2]) continue;
-                        if (!hash_done[idx2]) {
-                            unsigned nx2 = families[fam2].nops();
-                            auto br2 = subsector_bracket(gbrackets[fam2], nx2, sec2);
-                            auto perm = canonical_variable_permutation(br2, nx);
-                            memcpy(canonicalperms + idx2*maxfamilysize, &perm[0], nx);
-                            hash_t h = canonical_hash(br2, nx, perm);
-                            canonicalhashes[idx2] = h;
-                            atomic_thread_fence(memory_order_release);
-                            hash_done[idx2] = true;
-                            hashes_done->fetch_add(1, memory_order_relaxed);
-                            logd("Sector {}:{} is {}", fam2+1, sec2, h);
-                        }
-                        // "Acquire"-ordered memory fence. This prevents
-                        // any following reads or writes to be ordered
-                        // before any preceeding reads.
-                        // We need this here so that the following reads from
-                        // canonicalhashes would not be reordered before the
-                        // read of hash_done above -- unlikely as it is.
-                        atomic_thread_fence(memory_order_acquire);
-                        if (canonicalhashes[idx] == canonicalhashes[idx2]) {
-                            fully_mapped[fam] = true;
-                            logi("Family {} (top sector {}) is symmetric to family {}, sector {}",
-                                    fam+1, sector, fam2+1, sec2);
-                            uint8_t *perm = canonicalperms + idx*maxfamilysize;
-                            uint8_t *perm2 = canonicalperms + idx2*maxfamilysize;
-                            logd("Fam {} is {}, sec {} perm: {}", fam+1, families[fam],
-                                    sector, vector<uint8_t>(perm, perm+nx));
-                            logd("Fam {} is {}, sec {} perm: {}", fam2+1, families[fam2],
-                                    sec2, vector<uint8_t>(perm2, perm2+nx));
-                            exvector src, dst;
-                            for (unsigned i = 0; i < nx; i++) {
-                                int p2i = bitposition(sec2, perm2[i]);
-                                logd("  {} == {}", families[fam][perm[i]], families[fam2][p2i]);
-                                src.push_back(families[fam][perm[i]]);
-                                dst.push_back(families[fam2][p2i]);
-                            }
-                            auto mommap = find_momenta_map(src, dst, loopmomenta);
-                            logd("Mom map: {}", mommap);
-                            fam2mommap[fam] = to_string(mommap);
-                            goto found;
-                        }
-                    }
-                    logi("Family {} (top sector {}) is unique", fam+1, sector);
-                    hash2sector[canonicalhashes[idx]] = make_pair(fam, sector);
-                found:;
-                }
-                for (int i = 0 ; (i < JOBS) && (famsize != familysizeset.rend()); i++, famsize++);
-            }
-            if (FORK) {
-                logd("Exporting results");
-                ofstream f(tmpdir::filename(WORKER));
-                f << fam2mommap.size() << "\n";
-                for (auto &&fammap: fam2mommap) {
-                    f << fammap.first << " " << fammap.second << "\n";
-                }
-            }
-        FORK_END;
-        if (FORK) {
-            logd("Importing worker results");
-            for (int worker = 0; worker < JOBS; worker++) {
-                ifstream f(tmpdir::filename(worker));
-                int nentries; f >> nentries;
-                for (int i = 0; i < nentries; i++) {
-                    int fam; f >> fam;
-                    string line; f >> ws; getline(f, line);
-                    fam2mommap[fam] = line;
-                }
-            }
-            tmpdir::remove();
-        }
-        int ndone = 0;
-        for (unsigned i = 0; i < totalsectors; i++) {
-            ndone += !!hash_done[i];
-        }
-        logd("Canonized {} sectors out of {}, {}% of hashes wasted",
-            ndone, totalsectors, (hashes_done->load() - ndone)*100/(hashes_done->load()));
-        shared_free(canonicalperms, maxfamilysize * sizeof(uint8_t) * totalsectors);
-        shared_free(canonicalhashes, sizeof(hash_t) * totalsectors);
-        shared_free(hash_done, sizeof(uint8_t) * totalsectors);
-        shared_free(fully_mapped, sizeof(uint8_t) * totalsectors);
-        cout << "{";
-        for (unsigned fam = 0; fam < families.nops(); fam++) {
-            if (fam == 0) { cout << "\n "; }
-            else { cout << ",\n "; }
-            auto it = fam2mommap.find(fam);
-            if (it != fam2mommap.end()) {
-                cout << it->second;
-            } else {
-                cout << "{}";
-            }
-        }
-        cout << "\n}\n";
+        main_symmetrize(argv[1]);
     }
     else if (argc == 0) {
         cerr << "feynson: no command provided (use -h to see usage)" << endl;

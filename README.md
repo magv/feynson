@@ -29,6 +29,15 @@ the integrals over to an IBP relation solver.
   will make one a subset of the other if one family is
   isomorphic to a subsector of another family.
 
+  The input specification file should be a list of three
+  elements:
+  1) a list of all integral families, with each family
+     being a list of propagators (e.g. `(l1+l2)^2`);
+  2) a list of all loop momenta;
+  3) a list of external invariant substitution rules, each
+     rule being a list of two elements: a scalar product
+     and its substitution (e.g. Ql[{q^2, 1}]).
+
 * **zero-sectors** [-s] *spec-file*
 
   Print a list of all zero sectors of a given integral
@@ -36,12 +45,12 @@ the integrals over to an IBP relation solver.
 
   The input specification file should be a list of four
   elements:
-  1) a list of all propagator momenta (e.g. "(l1-q)^2");
-  2) a list of cut flags, "0" for normal propagators, "1"
+  1) a list of all propagator momenta (e.g. `(l1-q)^2`);
+  2) a list of cut flags, `0` for normal propagators, `1`
      for cut propagators;
-  3) a list of all loop momenta (e.g. "l1");
+  3) a list of all loop momenta (e.g. `l1`);
   4) and a list of external invariant substitutions (e.g.
-     "{q^2, 1}").
+     Ql[{q^2, 1}]).
 
   The output will be a list of zero sectors, each denoted
   by an integer s=2^{i_1-1} + ... + 2^{i_n-1}, where i_k
@@ -62,10 +71,10 @@ the integrals over to an IBP relation solver.
 
   The input specification file should be a list of three
   elements:
-  1) a list of all propagators, e.g. "(l1-q)^2";
-  2) a list of all loop momenta, e.g. "l1";
+  1) a list of all propagators, e.g. `(l1-q)^2`;
+  2) a list of all loop momenta, e.g. `l1`;
   3) and a list of external invariant substitutions, e.g.
-     "{q^2, 1}".
+     Ql[{q^2, 1}].
 
   The output will be a list of three items: the U polynomial,
   the F polynomial, and the list of Feynman parameter
@@ -97,7 +106,7 @@ the integrals over to an IBP relation solver.
 
 * *spec-file*
 
-  Filename of the input file, with "-" meaning the standard input.
+  Filename of the input file, with `-` meaning the standard input.
 
 ## ENVIRONMENT
 
