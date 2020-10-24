@@ -557,27 +557,40 @@ feynman_uf(const ex &denominators, const ex &loopmom, const ex &sprules, const s
     ex C;
     assert(denominators.nops() == X.size());
     for (unsigned d = 0; d < N; d++) {
-        // Decompose D_i = a_ij l_i l_j + b_ij l_i e_j + c
+        // Decompose D_i = a_ij l_i l_j + b_i l_i + c
         ex D = dens.op(d).expand();
         matrix a(L, L);
         matrix b(L, 1);
+        bool has_a = false;
+        bool has_b = false;
         for (unsigned i = 0; i < L; i++) {
             // l_i^2
             a(i, i) = D.coeff(loopmom.op(i), 2);
+            has_a = has_a || (!a(i, i).is_zero());
             D -= a(i, i)*loopmom.op(i)*loopmom.op(i);
             // l_i^1
             ex ki = D.coeff(loopmom.op(i), 1);
             for (unsigned j = i + 1; j < L; j++) {
                 ex k = ki.coeff(loopmom.op(j), 1);
                 a(i, j) = a(j, i) = k/2;
+                has_a = has_a || (!k.is_zero());
                 D -= k*loopmom.op(i)*loopmom.op(j);
             }
             b(i, 0) = D.coeff(loopmom.op(i), 1);
+            has_b = has_b || (!b(i, 0).is_zero());
             D -= (b(i, 0)*loopmom.op(i)).expand();
         }
         A = A.add(a.mul_scalar(X[d]));
         B = B.add(b.mul_scalar(X[d]/2));
         C += X[d]*D;
+        if (!has_a) {
+            if (has_b) {
+                loge("feynman_uf(): denominator #{} (={}) is linear in the loop momenta", d+1, dens.op(d));
+            } else {
+                loge("feynman_uf(): denominator #{} (={}) is free of the loop momenta", d+1, dens.op(d));
+            }
+            exit(1);
+        }
     }
     ex U = A.determinant().expand();
     ex F = C*U;
