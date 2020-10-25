@@ -40,6 +40,8 @@ Ss{COMMANDS}
         4) and a list of external invariant substitutions (e.g.
            Ql[{q^2, 1}]).
 
+        For example: Ql[{ {(q-l)^2, l^2}, {0, 0}, {l}, {{q^2,1}} }].
+
         The output will be a list of zero sectors, each denoted
         by an integer s=2^{i_1-1} + ... + 2^{i_n-1}, where i_k
         are the indices of denominators that belong to this
@@ -62,6 +64,8 @@ Ss{COMMANDS}
         2) a list of all loop momenta, e.g. Ql{l1};
         3) and a list of external invariant substitutions, e.g.
            Ql[{q^2, 1}].
+
+        For example: Ql[{ {(q-l)^2, l^2}, {l}, {{q^2,1}} }].
 
         The output will be a list of three items: the U polynomial,
         the F polynomial, and the list of Feynman parameter
@@ -539,6 +543,17 @@ symbolsequence(const char *prefix, int n)
     return x;
 }
 
+ex
+normalize_productrules(ex productrules)
+{
+    lst rules;
+    for (unsigned i = 0; i < productrules.nops(); i++) {
+        const ex &r = productrules.op(i);
+        rules.append(r.op(0) == r.op(1));
+    }
+    return rules;
+}
+
 symvector
 feynman_x(int ndens)
 {
@@ -549,7 +564,7 @@ pair<ex, ex>
 feynman_uf(const ex &denominators, const ex &loopmom, const ex &sprules, const symvector &X)
 {
     LOGME;
-    ex dens = denominators.expand().subs(sprules);
+    ex dens = denominators.expand().subs(sprules, subs_options::algebraic);
     unsigned N = dens.nops();
     unsigned L = loopmom.nops();
     matrix A(L, L);
@@ -596,7 +611,7 @@ feynman_uf(const ex &denominators, const ex &loopmom, const ex &sprules, const s
     ex F = C*U;
     for (unsigned i = 0; i < L; i++)
     for (unsigned j = 0; j < L; j++) {
-        ex k = (B(i, 0)*B(j, 0)).expand().subs(sprules);
+        ex k = (B(i, 0)*B(j, 0)).expand().subs(sprules, subs_options::algebraic);
         if (!k.is_zero()) F -= adjugate(A, i, j)*k;
     }
     return make_pair(U, F.expand());
@@ -1078,11 +1093,7 @@ main_ufx(const char *specfile)
     ex input = readfile(specfile, reader);
     ex denominators = input.op(0);
     ex loopmomenta = input.op(1);
-    ex productrules = input.op(2);
-    for (unsigned i = 0; i < productrules.nops(); i++) {
-        ex &r = productrules.let_op(i);
-        r = r.op(0) == r.op(1);
-    }
+    ex productrules = normalize_productrules(input.op(2));
     auto x = feynman_x(denominators.nops());
     auto uf = feynman_uf(denominators, loopmomenta, productrules, x);
     cout << "{\n " << uf.first << ",\n " << uf.second << ",\n " << x << "\n}" << endl;
@@ -1096,11 +1107,7 @@ main_zerosectors(const char *specfile, bool SHORT)
     ex denominators = input.op(0);
     ex cutflags = input.op(1);
     ex loopmomenta = input.op(2);
-    ex productrules = input.op(3);
-    for (unsigned i = 0; i < productrules.nops(); i++) {
-        ex &r = productrules.let_op(i);
-        r = r.op(0) == r.op(1);
-    }
+    ex productrules = normalize_productrules(input.op(3));
     auto x = feynman_x(denominators.nops());
     auto uf = feynman_uf(denominators, loopmomenta, productrules, x);
     uint64_t cutmask = 0;
@@ -1142,11 +1149,7 @@ main_symmetrize(const char *specfile)
     ex input = readfile(specfile, reader);
     ex families = input.op(0);
     ex loopmomenta = input.op(1);
-    ex productrules = input.op(2);
-    for (unsigned i = 0; i < productrules.nops(); i++) {
-        ex &r = productrules.let_op(i);
-        r = r.op(0) == r.op(1);
-    }
+    ex productrules = normalize_productrules(input.op(2));
     // Compute the set of all family sizes. We will only be
     // interested in sectors of these sizes.
     set<unsigned> familysizeset;
