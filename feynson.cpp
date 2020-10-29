@@ -25,7 +25,14 @@ Ss{COMMANDS}
         2) a list of all loop momenta;
         3) a list of external invariant substitution rules, each
            rule being a list of two elements: a scalar product
-           and its substitution (e.g. Ql[{q^2, 1}]).
+           and its substitution (e.g. Ql[{q^2, 1}] or Ql[{p1*p2, s12}]).
+
+        Each family that can be mapped to (a subsector of) another
+        is guaranteed to be mapped to the first possible family,
+        in the order of specification.
+
+        The families must come in the order of decreasing number
+        of denominators.
 
     Cm{zero-sectors} [Fl{-s}] Ar{spec-file}
         Print a list of all zero sectors of a given integral
@@ -1025,7 +1032,7 @@ find_momenta_map(const exvector &src, const exvector &dst, const ex &loopmom)
                 eqnum[eqset] = 0;
                 if (eqset == 0) {
                     // Nowhere to roll back. Fail.
-                    loge("find_momenta_map(): no solutions at all");
+                    loge("find_momenta_map(): no solutions at all; an external momenta symmetry?");
                     exit(1);
                 }
                 eqset--;
@@ -1314,17 +1321,22 @@ main_symmetrize(const char *specfile)
     FORK_BEGIN;
         // Pair each worker with its own set of family sizes.
         auto famsize = familysizeset.rbegin();
+        // Skip WORKER sizes.
         for (int i = 0 ; (i < WORKER) && (famsize != familysizeset.rend()); i++, famsize++);
         for (; famsize != familysizeset.rend(); ) {
-            logd("Searching for symmetries of families with {} propagators", *famsize);
+            logd("Computing symmetries for families with {} propagators", *famsize);
             map<hash_t, pair<int, uint64_t>> hash2sector;
             for (unsigned fam = 0; fam < families.nops(); fam += 1) {
                 unsigned nx = families[fam].nops();
                 if (nx != *famsize) continue;
+                // Looking at family fam.
                 uint64_t sector = (1ul << nx) - 1;
                 uint64_t idx = sector2idx[make_pair(fam, sector)];
                 assert(hash_done[idx]);
                 if (1) {
+                    // Check if the sector hash was already seen
+                    // and put into canonicalhashes. This is an
+                    // optional speedup.
                     auto secit = hash2sector.find(canonicalhashes[idx]);
                     if (secit != hash2sector.end()) {
                         int fam2 = secit->second.first;
@@ -1356,7 +1368,7 @@ main_symmetrize(const char *specfile)
                     unsigned fam2 = famsecidx.first.first;
                     int sec2 = famsecidx.first.second;
                     int idx2 = famsecidx.second;
-                    if (fam2 >= fam) break;
+                    if (fam2 >= fam) continue;
                     if (bitcount(sec2) != nx) continue;
                     if (fully_mapped[fam2]) continue;
                     if (!hash_done[idx2]) {
@@ -1405,6 +1417,7 @@ main_symmetrize(const char *specfile)
                 hash2sector[canonicalhashes[idx]] = make_pair(fam, sector);
             found:;
             }
+            // Skip JOBS sizes.
             for (int i = 0 ; (i < JOBS) && (famsize != familysizeset.rend()); i++, famsize++);
         }
         if (FORK) {

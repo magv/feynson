@@ -32,11 +32,18 @@ the integrals over to an IBP relation solver.
   The input specification file should be a list of three
   elements:
   1) a list of all integral families, with each family
-     being a list of propagators (e.g. `(l1+l2)^2`);
+     being a list of propagators (e.g. `(l1+l2)^2`);
   2) a list of all loop momenta;
   3) a list of external invariant substitution rules, each
-     rule being a list of two elements: a scalar product
-     and its substitution (e.g. Ql[{q^2, 1}]).
+     rule being a list of two elements: a scalar product
+     and its substitution (e.g. `{q^2, 1}` or `{p1×p2, s12}`).
+
+  Each family that can be mapped to (a subsector of) another
+  is guaranteed to be mapped to the first possible family,
+  in the order of specification.
+
+  The families must come in the order of decreasing number
+  of denominators.
 
 * **zero-sectors** [-s] *spec-file*
 
@@ -47,10 +54,12 @@ the integrals over to an IBP relation solver.
   elements:
   1) a list of all propagator momenta (e.g. `(l1-q)^2`);
   2) a list of cut flags, `0` for normal propagators, `1`
-     for cut propagators;
+     for cut propagators;
   3) a list of all loop momenta (e.g. `l1`);
   4) and a list of external invariant substitutions (e.g.
-     Ql[{q^2, 1}]).
+     `{q^2, 1}`).
+
+  For example: `{ {(q-l)^2, l^2}, {0, 0}, {l}, {{q^2,1}} }`.
 
   The output will be a list of zero sectors, each denoted
   by an integer s=2^{i_1-1} + ... + 2^{i_n-1}, where i_k
@@ -74,7 +83,9 @@ the integrals over to an IBP relation solver.
   1) a list of all propagators, e.g. `(l1-q)^2`;
   2) a list of all loop momenta, e.g. `l1`;
   3) and a list of external invariant substitutions, e.g.
-     Ql[{q^2, 1}].
+     `{q^2, 1}`.
+
+  For example: `{ {(q-l)^2, l^2}, {l}, {{q^2,1}} }`.
 
   The output will be a list of three items: the U polynomial,
   the F polynomial, and the list of Feynman parameter
