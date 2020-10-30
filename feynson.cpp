@@ -8,7 +8,7 @@ Ss{SYNOPSYS}
 Ss{DESCRIPTION}
 
 Ss{COMMANDS}
-    Cm{symmetrize} Ar{spec-file}
+    Nm{feynson} Cm{symmetrize} Ar{spec-file}
         Print a list of momenta substitutions that make symmetries
         between a list of integral families explicit.
 
@@ -29,12 +29,9 @@ Ss{COMMANDS}
 
         Each family that can be mapped to (a subsector of) another
         is guaranteed to be mapped to the first possible family,
-        in the order of specification.
+        prefering families that are larger or listed earlier.
 
-        The families must come in the order of decreasing number
-        of denominators.
-
-    Cm{zero-sectors} [Fl{-s}] Ar{spec-file}
+    Nm{feynson} Cm{zero-sectors} [Fl{-s}] Ar{spec-file}
         Print a list of all zero sectors of a given integral
         family.
 
@@ -61,7 +58,7 @@ Ss{COMMANDS}
         Every sector that is missing a cut propagator of its
         supersectors will be reported as zero.
 
-    Cm{ufx} Ar{spec-file}
+    Nm{feynson} Cm{ufx} Ar{spec-file}
         Print Feynman parametrization (U, F, X) of an integral
         defined by a set of propagators.
 
@@ -1260,15 +1257,29 @@ main_symmetrize(const char *specfile)
         logd("Done combining output");
         tmpdir::remove();
     }
-    // Enumerate the sectors we're interested in.
+    // Family indices in the order of decreasing family size;
+    vector<unsigned> family_order(families.nops());
+    for (unsigned i = 0; i < families.nops(); i++) family_order[i] = i;
+    stable_sort(
+        family_order.begin(), family_order.end(),
+        [&](unsigned a, unsigned b) -> bool {
+            return families.op(a).nops() > families.op(b).nops();
+        });
+    // Enumerate all the sectors of sizes we are interested in,
+    // assign each an index.
     map<pair<unsigned, uint64_t>, uint64_t> sector2idx;
-    for (unsigned fam = 0; fam < families.nops(); fam++) {
+    // The same sectors in the order of family_order.
+    vector<tuple<unsigned, uint64_t, uint64_t>> sectors;
+    for (unsigned i = 0; i < families.nops(); i++) {
+        unsigned fam = family_order[i];
         uint64_t nsectors = 1ul << families[fam].nops();
         // TODO: these two loops waste time.
         for (unsigned ssize : familysizeset) {
             for (uint64_t sec = 1; sec < nsectors; sec++) {
                 if ((bitcount(sec) == ssize)/* && !zeros[fam][sec]*/) {
-                    sector2idx[make_pair(fam, sec)] = sector2idx.size();
+                    auto index = sector2idx.size();
+                    sector2idx[make_pair(fam, sec)] = index;
+                    sectors.push_back(make_tuple(fam, sec, index));
                 }
             }
         }
@@ -1364,11 +1375,16 @@ main_symmetrize(const char *specfile)
                         goto found;
                     }
                 }
-                for (auto &&famsecidx : sector2idx) {
-                    unsigned fam2 = famsecidx.first.first;
-                    int sec2 = famsecidx.first.second;
-                    int idx2 = famsecidx.second;
-                    if (fam2 >= fam) continue;
+                // Iterate sectors in the order of decreasing family size.
+                for (auto &&famsecidx : sectors) {
+                    auto fam2 = get<0>(famsecidx);
+                    auto sec2 = get<1>(famsecidx);
+                    auto idx2 = get<2>(famsecidx);
+                    if (fam2 == fam) {
+                        // Stop the search if we've run out of families that
+                        // are either larger or were listed earlier.
+                        break;
+                    }
                     if (bitcount(sec2) != nx) continue;
                     if (fully_mapped[fam2]) continue;
                     if (!hash_done[idx2]) {

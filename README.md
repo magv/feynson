@@ -18,7 +18,7 @@ the integrals over to an IBP relation solver.
 
 ## COMMANDS
 
-* **symmetrize** *spec-file*
+* `feynson` **symmetrize** *spec-file*
 
   Print a list of momenta substitutions that make symmetries
   between a list of integral families explicit.
@@ -36,16 +36,13 @@ the integrals over to an IBP relation solver.
   2) a list of all loop momenta;
   3) a list of external invariant substitution rules, each
      rule being a list of two elements: a scalar product
-     and its substitution (e.g. `{q^2, 1}` or `{p1×p2, s12}`).
+     and its substitution (e.g. `{q^2, 1}` or `{p1*p2, s12}`).
 
   Each family that can be mapped to (a subsector of) another
   is guaranteed to be mapped to the first possible family,
-  in the order of specification.
+  prefering families that are larger or listed earlier.
 
-  The families must come in the order of decreasing number
-  of denominators.
-
-* **zero-sectors** [-s] *spec-file*
+* `feynson` **zero-sectors** [-s] *spec-file*
 
   Print a list of all zero sectors of a given integral
   family.
@@ -73,7 +70,7 @@ the integrals over to an IBP relation solver.
   Every sector that is missing a cut propagator of its
   supersectors will be reported as zero.
 
-* **ufx** *spec-file*
+* `feynson` **ufx** *spec-file*
 
   Print Feynman parametrization (U, F, X) of an integral
   defined by a set of propagators.
