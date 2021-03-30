@@ -25,7 +25,9 @@ need UPX [3], and the static versions of GiNaC and Nauty libraries
     make feynson.static
 
 [1] https://www.ginac.de/
+
 [2] https://pallini.di.uniroma1.it/
+
 [3] https://upx.github.io/
 
 # MANUAL
