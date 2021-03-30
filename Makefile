@@ -14,11 +14,11 @@ XLDFLAGS_STATIC=${XLDFLAGS}
 all: feynson
 
 feynson: feynson.cpp ginacutils.cpp blake2b.c
-	@date "+static const char VERSION[] = \"Feynson $$(hg id -i), built on %Y-%m-%d\n\";" >version.h
+	@date "+static const char VERSION[] = \"Feynson $$(git --git-dir=.git rev-parse --short=12 HEAD 2>/dev/null || hg -R. id -i), built on %Y-%m-%d\n\";" >version.h
 	${CXX} ${XCFLAGS} -include version.h -o $@ $< ${XLDFLAGS}
 
 feynson.static: feynson.cpp ginacutils.cpp blake2b.c
-	@date "+static const char VERSION[] = \"Feynson $$(hg id -i), built on %Y-%m-%d\n\";" >version.h
+	@date "+static const char VERSION[] = \"Feynson $$(git --git-dir=.git rev-parse --short=12 HEAD 2>/dev/null || hg -R. id -i), built on %Y-%m-%d\n\";" >version.h
 	${CXX} ${XCFLAGS_STATIC} -include version.h -o $@ $< ${XLDFLAGS_STATIC}
 	@upx --best "$@"
 
