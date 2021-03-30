@@ -4,6 +4,30 @@
 One can use it to reduce the number of families before handing
 the integrals over to an IBP relation solver.
 
+In principle IBP solvers perform all the functions of *Feynson*
+too. The need for a separate tool is that the construction of
+integral families needs to be done before the final expression
+is ready for an IBP solver. Additionally, not all IBP solvers
+are optimized to receive thousands of (mostly redundant) integral
+families; *Feynson* is.
+
+# BUILDING
+
+To build *Feynson*, first install GiNaC [1] and Nauty [2]
+libraries, and then run:
+
+    make
+
+A static binary of *Feynson* can also be built. For this you will
+need UPX [3], and the static versions of GiNaC and Nauty libraries
+(as well as their dependencies). Once those are ready, run:
+
+    make feynson.static
+
+[1] https://www.ginac.de/
+[2] https://pallini.di.uniroma1.it/
+[3] https://upx.github.io/
+
 # MANUAL
 
 ## NAME
