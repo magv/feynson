@@ -374,7 +374,7 @@ void *
 shared_alloc(size_t size)
 {
     // We could have used calloc() if FORK is false. Meh.
-    void *mem = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    void *mem = mmap(NULL, size >= 1 ? size : 1, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
     if (mem == MAP_FAILED) {
         loge("Failed to mmap() {} bytes of shared memory: {}", size, strerror(errno));
         exit(1);
@@ -385,7 +385,7 @@ shared_alloc(size_t size)
 void
 shared_free(void *memory, size_t size)
 {
-    if (munmap(memory, size) != 0) {
+    if (munmap(memory, size >= 1 ? size : 1) != 0) {
         logw("Failed to munmap() {} bytes of shared memory: {}", size, strerror(errno));
     }
 }
@@ -1161,7 +1161,7 @@ main_symmetrize(const char *specfile)
     for (auto &&family : families) {
         unsigned ndens = family.nops();
         assert(ndens < 256);
-        familysizeset.insert(ndens);
+        if (ndens > 0) familysizeset.insert(ndens);
         maxfamilysize = max(maxfamilysize, ndens);
     }
     logd("Family size set: {}", familysizeset);
@@ -1297,6 +1297,7 @@ main_symmetrize(const char *specfile)
         logd("Precomputing canonical polynomials of each family");
         for (unsigned fam = WORKER; fam < families.nops(); fam += JOBS) {
             unsigned nx = families[fam].nops();
+            if (nx == 0) continue;
             uint64_t sector = (1ul << nx) - 1;
             uint64_t idx = sector2idx[make_pair(fam, sector)];
             assert(!hash_done[idx]);
@@ -1463,7 +1464,7 @@ main_symmetrize(const char *specfile)
         ndone += !!hash_done[i];
     }
     logd("Canonized {} sectors out of {}, {}% of hashes wasted",
-        ndone, totalsectors, (hashes_done->load() - ndone)*100/(hashes_done->load()));
+        ndone, totalsectors, (hashes_done->load() - ndone)*100/(max(hashes_done->load(), 1)));
     shared_free(canonicalperms, maxfamilysize * sizeof(uint8_t) * totalsectors);
     shared_free(canonicalhashes, sizeof(hash_t) * totalsectors);
     shared_free(hash_done, sizeof(uint8_t) * totalsectors);
