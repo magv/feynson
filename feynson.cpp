@@ -27,9 +27,36 @@ Ss{COMMANDS}
            rule being a list of two elements: a scalar product
            and its substitution (e.g. Ql[{q^2, 1}] or Ql[{p1*p2, s12}]).
 
+        For example: Ql[{ {{(q-l)^2, l^2}, {(q+l)^2, l^2}}, {l}, {} }].
+
         Each family that can be mapped to (a subsector of) another
         is guaranteed to be mapped to the first possible family,
         prefering families that are larger or listed earlier.
+
+        Note that if non-trivial invariant substitution rules
+        are supplied, it becomes possible that two families are
+        identical, but no loop momenta substitution exists to map
+        them onto each other. For example, a 1-loop propagator
+        with momenta Ql[p1] is equal to a 1-loop propagator with
+        Ql[p2], but only if Ql[p1^2 = p2^2], in which case no loop
+        momenta substitution can make the integrands identical.
+
+        For this reason, it is best to use Cm{symmetrize} with the
+        invariant substitution rules set to Ql[{}], and to fall back
+        to Cm{mapping-rules} otherwise.
+
+    Nm{feynson} Cm{mapping-rules} Ar{spec-file}
+
+        Same as Cm{symmetrize}, but instead of printing the loop
+        momenta substitutions, produce explicit rules of mapping
+        between families: for each family that is symmetric to
+        another, print Ql[{fam, {n1, n2, ...}}], meaning that any
+        integral in this family with indices Ql[{i_1, i_2, ...}]
+        is equal to an integral in the family number Ql[fam] with
+        indices Ql[{i_n1, i_n2, ...}]. For unique families, print Ql[{}].
+        The families are numbered starting at 1. If a given family
+        is symmetric to a subfamily, some of the Ql{n} indices will
+        be Ql{0}: the convention is that Ql{i_0 = 0}.
 
     Nm{feynson} Cm{zero-sectors} [Fl{-s}] Ar{spec-file}
         Print a list of all zero sectors of a given integral
@@ -621,17 +648,22 @@ feynman_uf(const ex &denominators, const ex &loopmom, const ex &sprules, const s
     return make_pair(U, F.expand());
 }
 
+/* Represent a polynomial in a list of variables as
+ * Sum_i (x1^k1i x2^k2i ... xN^kNi Ci), and return
+ * a map from variable exponents to coefficients,
+ * {k1i, ..., kNi} -> Ci.
+ */
 map<vector<int>, ex>
-bracket(const ex &expr, const symvector &stemset)
+bracket(const ex &expr, const symvector &X)
 {
     LOGME;
     map<vector<int>, ex> result;
     map<ex, int, ex_is_less> sym2id;
-    for (unsigned i = 0; i < stemset.size(); i++) {
-        sym2id[stemset[i]] = i;
+    for (unsigned i = 0; i < X.size(); i++) {
+        sym2id[X[i]] = i;
     }
     term_iter(expr.expand(), [&](const ex &term) {
-        vector<int> stemidx(stemset.size());
+        vector<int> stemidx(X.size());
         exvector coef;
         factor_iter(term, [&](const ex &factor, int power) {
             auto it = sym2id.find(factor);
@@ -1147,7 +1179,7 @@ main_zerosectors(const char *specfile, bool SHORT)
 }
 
 void
-main_symmetrize(const char *specfile)
+main_symmetrize(const char *specfile, bool compute_mommap)
 {
     parser reader;
     ex input = readfile(specfile, reader);
@@ -1326,7 +1358,7 @@ main_symmetrize(const char *specfile)
     // each family in order, compute and remember hashes of
     // their canonical polys, noting any duplicates along
     // the way.
-    map<int, string> fam2mommap;
+    map<int, string> fam2result;
     if (FORK) {
         tmpdir::create("feynson");
     }
@@ -1363,17 +1395,36 @@ main_symmetrize(const char *specfile)
                                 sector, vector<uint8_t>(perm, perm+nx));
                         logd("Fam {} is {}, sec {} perm: {}", fam2+1, families[fam2],
                                 sec2, vector<uint8_t>(perm2, perm2+nx));
-                        exvector src, dst;
-                        for (unsigned i = 0; i < nx; i++) {
-                            int p2i = bitposition(sec2, perm2[i]);
-                            logd("  {} == {}", families[fam][perm[i]], families[fam2][p2i]);
-                            src.push_back(families[fam][perm[i]]);
-                            dst.push_back(families[fam2][p2i]);
+                        if (compute_mommap) {
+                            exvector src, dst;
+                            for (unsigned i = 0; i < nx; i++) {
+                                int p2i = bitposition(sec2, perm2[i]);
+                                logd("  {} == {}", families[fam][perm[i]], families[fam2][p2i]);
+                                src.push_back(families[fam][perm[i]]);
+                                dst.push_back(families[fam2][p2i]);
+                            }
+                            auto mommap = find_momenta_map(src, dst, loopmomenta);
+                            logd("Mom map: {}", mommap);
+                            fam2result[fam] = to_string(mommap);
+                        } else {
+                            unsigned nx2 = families[fam2].nops();
+                            vector<uint8_t> expr(nx2);
+                            for (unsigned i = 0; i < nx; i++) {
+                                int p2i = bitposition(sec2, perm2[i]);
+                                logd("  fam{} #{} == fam{} #{}", fam+1, perm[i]+1, fam2+1, p2i+1);
+                                logd("  {} == {}", families[fam][perm[i]], families[fam2][p2i]);
+                                expr[p2i] = perm[i]+1;
+                            }
+                            ostringstream s;
+                            s << "{" << fam2+1 << ", {";
+                            for (unsigned i = 0; i < nx2; i++) {
+                                if (i != 0) s << ",";
+                                s << (int)expr[i]; 
+                            }
+                            s << "}}";
+                            fam2result[fam] = s.str();
+                            logd("Result: {}", fam2result[fam]);
                         }
-                        auto mommap = find_momenta_map(src, dst, loopmomenta);
-                        logd("Mom map: {}", mommap);
-                        fam2mommap[fam] = to_string(mommap);
-                        goto found;
                     }
                 }
                 // Iterate sectors in the order of decreasing family size.
@@ -1417,16 +1468,36 @@ main_symmetrize(const char *specfile)
                                 sector, vector<uint8_t>(perm, perm+nx));
                         logd("Fam {} is {}, sec {} perm: {}", fam2+1, families[fam2],
                                 sec2, vector<uint8_t>(perm2, perm2+nx));
-                        exvector src, dst;
-                        for (unsigned i = 0; i < nx; i++) {
-                            int p2i = bitposition(sec2, perm2[i]);
-                            logd("  {} == {}", families[fam][perm[i]], families[fam2][p2i]);
-                            src.push_back(families[fam][perm[i]]);
-                            dst.push_back(families[fam2][p2i]);
+                        if (compute_mommap) {
+                            exvector src, dst;
+                            for (unsigned i = 0; i < nx; i++) {
+                                int p2i = bitposition(sec2, perm2[i]);
+                                logd("  {} == {}", families[fam][perm[i]], families[fam2][p2i]);
+                                src.push_back(families[fam][perm[i]]);
+                                dst.push_back(families[fam2][p2i]);
+                            }
+                            auto mommap = find_momenta_map(src, dst, loopmomenta);
+                            logd("Mom map: {}", mommap);
+                            fam2result[fam] = to_string(mommap);
+                        } else {
+                            unsigned nx2 = families[fam2].nops();
+                            vector<uint8_t> expr(nx2);
+                            for (unsigned i = 0; i < nx; i++) {
+                                int p2i = bitposition(sec2, perm2[i]);
+                                logd("  fam{} #{} == fam{} #{}", fam+1, perm[i]+1, fam2+1, p2i+1);
+                                logd("  {} == {}", families[fam][perm[i]], families[fam2][p2i]);
+                                expr[p2i] = perm[i]+1;
+                            }
+                            ostringstream s;
+                            s << "{" << fam2+1 << ", {";
+                            for (unsigned i = 0; i < nx2; i++) {
+                                if (i != 0) s << ",";
+                                s << (int)expr[i]; 
+                            }
+                            s << "}}";
+                            fam2result[fam] = s.str();
+                            logd("Result: {}", fam2result[fam]);
                         }
-                        auto mommap = find_momenta_map(src, dst, loopmomenta);
-                        logd("Mom map: {}", mommap);
-                        fam2mommap[fam] = to_string(mommap);
                         goto found;
                     }
                 }
@@ -1440,8 +1511,8 @@ main_symmetrize(const char *specfile)
         if (FORK) {
             logd("Exporting results");
             ofstream f(tmpdir::filename(WORKER));
-            f << fam2mommap.size() << "\n";
-            for (auto &&fammap: fam2mommap) {
+            f << fam2result.size() << "\n";
+            for (auto &&fammap: fam2result) {
                 f << fammap.first << " " << fammap.second << "\n";
             }
         }
@@ -1454,7 +1525,7 @@ main_symmetrize(const char *specfile)
             for (int i = 0; i < nentries; i++) {
                 int fam; f >> fam;
                 string line; f >> ws; getline(f, line);
-                fam2mommap[fam] = line;
+                fam2result[fam] = line;
             }
         }
         tmpdir::remove();
@@ -1473,8 +1544,8 @@ main_symmetrize(const char *specfile)
     for (unsigned fam = 0; fam < families.nops(); fam++) {
         if (fam == 0) { cout << "\n "; }
         else { cout << ",\n "; }
-        auto it = fam2mommap.find(fam);
-        if (it != fam2mommap.end()) {
+        auto it = fam2result.find(fam);
+        if (it != fam2result.end()) {
             cout << it->second;
         } else {
             cout << "{}";
@@ -1518,7 +1589,10 @@ main(int argc, char *argv[])
         main_zerosectors(argv[1], SHORT);
     }
     else IFCMD("symmetrize", argc == 2) {
-        main_symmetrize(argv[1]);
+        main_symmetrize(argv[1], true);
+    }
+    else IFCMD("mapping-rules", argc == 2) {
+        main_symmetrize(argv[1], false);
     }
     else if (argc == 0) {
         cerr << "feynson: no command provided (use -h to see usage)" << endl;

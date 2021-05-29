@@ -64,9 +64,36 @@ need UPX [3], and the static versions of GiNaC and Nauty libraries
      rule being a list of two elements: a scalar product
      and its substitution (e.g. `{q^2, 1}` or `{p1*p2, s12}`).
 
+  For example: `{ {{(q-l)^2, l^2}, {(q+l)^2, l^2}}, {l}, {} }`.
+
   Each family that can be mapped to (a subsector of) another
   is guaranteed to be mapped to the first possible family,
   prefering families that are larger or listed earlier.
+
+  Note that if non-trivial invariant substitution rules
+  are supplied, it becomes possible that two families are
+  identical, but no loop momenta substitution exists to map
+  them onto each other. For example, a 1-loop propagator
+  with momenta `p1` is equal to a 1-loop propagator with
+  `p2`, but only if `p1^2 = p2^2`, in which case no loop
+  momenta substitution can make the integrands identical.
+
+  For this reason, it is best to use **symmetrize** with the
+  invariant substitution rules set to `{}`, and to fall back
+  to **mapping-rules** otherwise.
+
+* `feynson` **mapping-rules** *spec-file*
+
+  Same as **symmetrize**, but instead of printing the loop
+  momenta substitutions, produce explicit rules of mapping
+  between families: for each family that is symmetric to
+  another, print `{fam, {n1, n2, ...}}`, meaning that any
+  integral in this family with indices `{i_1, i_2, ...}`
+  is equal to an integral in the family number `fam` with
+  indices `{i_n1, i_n2, ...}`. For unique families, print `{}`.
+  The families are numbered starting at 1. If a given family
+  is symmetric to a subfamily, some of the `n` indices will
+  be `0`: the convention is that `i_0 = 0`.
 
 * `feynson` **zero-sectors** [-s] *spec-file*
 
