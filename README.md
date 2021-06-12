@@ -38,7 +38,7 @@ need UPX [3], and the static versions of GiNaC and Nauty libraries
 
 ## SYNOPSYS
 
-`feynson` [options] **command** *args* ...
+`feynson` [`options`] **command** *args* ...
 
 ## DESCRIPTION
 
@@ -69,6 +69,8 @@ need UPX [3], and the static versions of GiNaC and Nauty libraries
   Each family that can be mapped to (a subsector of) another
   is guaranteed to be mapped to the first possible family,
   prefering families that are larger or listed earlier.
+  If `-d` flag is given, earlier families are prefered
+  irrespective of their size.
 
   Note that if non-trivial invariant substitution rules
   are supplied, it becomes possible that two families are
@@ -95,7 +97,7 @@ need UPX [3], and the static versions of GiNaC and Nauty libraries
   is symmetric to a subfamily, some of the `n` indices will
   be `0`: the convention is that `i_0 = 0`.
 
-* `feynson` **zero-sectors** [-s] *spec-file*
+* `feynson` **zero-sectors** [`-s`] *spec-file*
 
   Print a list of all zero sectors of a given integral
   family.
@@ -116,7 +118,7 @@ need UPX [3], and the static versions of GiNaC and Nauty libraries
   are the indices of denominators that belong to this
   sector (counting from 1).
 
-  If the -s flag is given, the output will be shortened
+  If the `-s` flag is given, the output will be shortened
   by only listing the topmost zero sectors: all the remaining
   zero sectors are their subsectors.
 
@@ -143,23 +145,27 @@ need UPX [3], and the static versions of GiNaC and Nauty libraries
 
 ## OPTIONS
 
-* -j *jobs*
+* `-j` *jobs*
 
   Parallelize calculations using at most this many workers.
 
-* -s
+* `-d`
+
+  Prioritize families in the definition order, irrespective of size.
+
+* `-s`
 
   Shorten the output (depending on the command).
 
-* -q
+* `-q`
 
   Print a more quiet log.
 
-* -h
+* `-h`
 
   Show this help message.
 
-* -V
+* `-V`
 
   Print version information.
 

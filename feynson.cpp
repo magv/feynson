@@ -32,6 +32,8 @@ Ss{COMMANDS}
         Each family that can be mapped to (a subsector of) another
         is guaranteed to be mapped to the first possible family,
         prefering families that are larger or listed earlier.
+        If Fl{-d} flag is given, earlier families are prefered
+        irrespective of their size.
 
         Note that if non-trivial invariant substitution rules
         are supplied, it becomes possible that two families are
@@ -104,6 +106,7 @@ Ss{COMMANDS}
 
 Ss{OPTIONS}
     Fl{-j} Ar{jobs}    Parallelize calculations using at most this many workers.
+    Fl{-d}         Prioritize families in the definition order, irrespective of size.
     Fl{-s}         Shorten the output (depending on the command).
     Fl{-q}         Print a more quiet log.
     Fl{-h}         Show this help message.
@@ -1179,7 +1182,7 @@ main_zerosectors(const char *specfile, bool SHORT)
 }
 
 void
-main_symmetrize(const char *specfile, bool compute_mommap)
+main_symmetrize(const char *specfile, bool def_order, bool compute_mommap)
 {
     parser reader;
     ex input = readfile(specfile, reader);
@@ -1292,11 +1295,13 @@ main_symmetrize(const char *specfile, bool compute_mommap)
     // Family indices in the order of decreasing family size;
     vector<unsigned> family_order(families.nops());
     for (unsigned i = 0; i < families.nops(); i++) family_order[i] = i;
-    stable_sort(
-        family_order.begin(), family_order.end(),
-        [&](unsigned a, unsigned b) -> bool {
-            return families.op(a).nops() > families.op(b).nops();
-        });
+    if (!def_order) {
+        stable_sort(
+            family_order.begin(), family_order.end(),
+            [&](unsigned a, unsigned b) -> bool {
+                return families.op(a).nops() > families.op(b).nops();
+            });
+    }
     // Enumerate all the sectors of sizes we are interested in,
     // assign each an index.
     map<pair<unsigned, uint64_t>, uint64_t> sector2idx;
@@ -1569,7 +1574,8 @@ main(int argc, char *argv[])
     std::ios_base::sync_with_stdio(false);
     cerr.unsetf(std::ios::unitbuf);
     bool SHORT = false;
-    for (int opt; (opt = getopt(argc, argv, "hqsCVj:")) != -1;) {
+    bool DEF_ORDER = false;
+    for (int opt; (opt = getopt(argc, argv, "dhqsCVj:")) != -1;) {
         switch (opt) {
         case 'h': usage(); return 0;
         case 'V': cout << VERSION; return 0;
@@ -1577,6 +1583,7 @@ main(int argc, char *argv[])
         case 'C': COLORS = true; break;
         case 's': SHORT = true; break;
         case 'j': JOBS = atoi(optarg); if (JOBS < 1) JOBS = 1; break;
+        case 'd': DEF_ORDER = true; break;
         default: return 1;
         }
     }
@@ -1589,10 +1596,10 @@ main(int argc, char *argv[])
         main_zerosectors(argv[1], SHORT);
     }
     else IFCMD("symmetrize", argc == 2) {
-        main_symmetrize(argv[1], true);
+        main_symmetrize(argv[1], DEF_ORDER, true);
     }
     else IFCMD("mapping-rules", argc == 2) {
-        main_symmetrize(argv[1], false);
+        main_symmetrize(argv[1], DEF_ORDER, false);
     }
     else if (argc == 0) {
         cerr << "feynson: no command provided (use -h to see usage)" << endl;
