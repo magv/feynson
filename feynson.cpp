@@ -185,7 +185,7 @@ operator <(const hash_t &a, const hash_t &b)
  * able to see these definitions.
  */
 
-ostream&
+static ostream&
 operator <<(ostream &o, const set<unsigned> &v)
 {
     o << "set{";
@@ -202,7 +202,7 @@ operator <<(ostream &o, const set<unsigned> &v)
     return o;
 }
 
-ostream&
+static ostream&
 operator <<(ostream &o, const hash_t &v)
 {
     for (size_t i = 0; i < sizeof(v.hash); i++) {
@@ -214,7 +214,7 @@ operator <<(ostream &o, const hash_t &v)
     return o;
 }
 
-template<typename T> ostream&
+template<typename T> static ostream&
 operator <<(ostream &o, const vector<T> &v)
 {
     o << "{";
@@ -226,7 +226,7 @@ operator <<(ostream &o, const vector<T> &v)
     return o;
 }
 
-ostream&
+static ostream&
 operator <<(ostream &o, const vector<uint8_t> &v)
 {
     o << "{";
@@ -238,7 +238,7 @@ operator <<(ostream &o, const vector<uint8_t> &v)
     return o;
 }
 
-string
+static string
 to_string(const ex& expr)
 {
     ostringstream s;
@@ -260,7 +260,7 @@ static auto _log_starttime = chrono::steady_clock::now();
 static auto _log_lasttime = chrono::steady_clock::now();
 static int _log_depth = 0;
 
-const char*
+static const char*
 log_adv(const char *fmt)
 {
     for (int i = 0; ; i++) {
@@ -284,7 +284,7 @@ log_format(ostream &o, const T &value)
     o << value;
 }
 
-void
+static void
 log_print_start(const char *pre, const char *post)
 {
     auto t = chrono::steady_clock::now();
@@ -300,7 +300,7 @@ log_print_start(const char *pre, const char *post)
     _log_lasttime = t;
 }
 
-template<typename T> const char *
+template<typename T> static const char *
 log_print_one(const char *fmt, const T &value)
 {
     fmt = log_adv(fmt);
@@ -308,7 +308,7 @@ log_print_one(const char *fmt, const T &value)
     return fmt;
 }
 
-void
+static void
 log_print_end(const char *fmt)
 {
     cerr << fmt;
@@ -402,7 +402,7 @@ struct _scopeexithack {
 /* Allocate size bytes of memory identically visible across the
  * forked workers.
  */
-void *
+static void *
 shared_alloc(size_t size)
 {
     // We could have used calloc() if FORK is false. Meh.
@@ -414,7 +414,7 @@ shared_alloc(size_t size)
     return mem;
 }
 
-void
+static void
 shared_free(void *memory, size_t size)
 {
     if (munmap(memory, size >= 1 ? size : 1) != 0) {
@@ -555,7 +555,7 @@ is_subsector(uint64_t subsector, uint64_t sector)
  * ==========
  */
 
-ex
+static ex
 readfile(const char *filename, parser &reader)
 {
     if (strcmp(filename, "-") == 0) {
@@ -567,7 +567,7 @@ readfile(const char *filename, parser &reader)
     }
 }
 
-symvector
+static symvector
 symbolsequence(const char *prefix, int n)
 {
     symvector x(n);
@@ -579,7 +579,7 @@ symbolsequence(const char *prefix, int n)
     return x;
 }
 
-ex
+static ex
 normalize_productrules(ex productrules)
 {
     lst rules;
@@ -590,13 +590,13 @@ normalize_productrules(ex productrules)
     return rules;
 }
 
-symvector
+static symvector
 feynman_x(int ndens)
 {
     return symbolsequence("x", ndens);
 }
 
-pair<ex, ex>
+static pair<ex, ex>
 feynman_uf(const ex &denominators, const ex &loopmom, const ex &sprules, const symvector &X)
 {
     LOGME;
@@ -658,7 +658,7 @@ feynman_uf(const ex &denominators, const ex &loopmom, const ex &sprules, const s
  * a map from variable exponents to coefficients,
  * {k1i, ..., kNi} -> Ci.
  */
-map<vector<int>, ex>
+static map<vector<int>, ex>
 bracket(const ex &expr, const symvector &X)
 {
     LOGME;
@@ -687,30 +687,7 @@ bracket(const ex &expr, const symvector &X)
     return result;
 }
 
-bool
-family_is_zero(const ex &G, const symvector &X)
-{
-    LOGME;
-    symvector K = symbolsequence("k", X.size());
-    ex eqn = G;
-    for (unsigned i = 0; i < X.size(); i++) {
-        eqn -= K[i]*X[i]*G.diff(X[i]);
-    }
-    matrix eqns(0, K.size() + 1);
-    for (auto &&kv : bracket(eqn, X)) {
-        ex c0 = kv.second;
-        exvector c(K.size() + 1);
-        for (unsigned i = 0; i < K.size(); i++) {
-            c[i] = c0.coeff(K[i]);
-            c0 -= c[i]*K[i];
-        }
-        c[X.size()] = c0.expand();
-        ((matrix_hack*)&eqns)->append_row(c);
-    }
-    return eqns.rank() <= K.size();
-}
-
-vector<bool>
+static vector<bool>
 zero_sectors(const ex &G, const symvector &X, uint64_t cutmask)
 {
     LOGME;
@@ -935,17 +912,7 @@ canonical_variable_permutation(const vector<pair<vector<int>, int>> &polybr, uns
     return result;
 }
 
-ex
-canonical_poly(const ex &poly, symvector X, vector<int> perm)
-{
-    lst sub;
-    for (unsigned i = 0; i < X.size(); i++) {
-        sub.append(X[perm[i]] == X[i]);
-    }
-    return poly.subs(sub);
-}
-
-hash_t
+static hash_t
 canonical_hash(const vector<pair<vector<int>, int>> &polybr, unsigned nx, vector<uint8_t> perm)
 {
     assert((polybr.size() == 0) || (polybr[0].first.size() == nx));
@@ -973,31 +940,7 @@ canonical_hash(const vector<pair<vector<int>, int>> &polybr, unsigned nx, vector
     return result;
 }
 
-vector<uint8_t>
-canonical_variable_permutation(const ex &poly, const symvector &X)
-{
-    // A list of stems and corresponding unique coefficient ids.
-    map<vector<int>, ex> br = bracket(poly.expand(), X);
-    // Find unique coefficients and sort them.
-    exset coefset;
-    for (auto &&stemcoef : br) {
-        coefset.insert(stemcoef.second);
-    }
-    // Assign each unique coefficient an index, in increasing
-    // order.
-    map<ex, int, ex_is_less> coef2uniqid;
-    for (auto &&coef : coefset) {
-        logd(" C{} = {}", coef2uniqid.size(), coef);
-        coef2uniqid[coef] = coef2uniqid.size();
-    }
-    vector<pair<vector<int>, int>> polybr;
-    for (auto &&stemcoef : br) {
-        polybr.push_back(make_pair(stemcoef.first, coef2uniqid[stemcoef.second]));
-    }
-    return canonical_variable_permutation(polybr, X.size());
-}
-
-exvector
+static exvector
 lincoefficients(const ex &expr, const symvector &vars)
 {
     exvector coefs;
@@ -1016,7 +959,7 @@ lincoefficients(const ex &expr, const symvector &vars)
     return coefs;
 }
 
-ex
+static ex
 find_momenta_map(const exvector &src, const exvector &dst, const ex &loopmom)
 {
     LOGME;
@@ -1091,7 +1034,7 @@ find_momenta_map(const exvector &src, const exvector &dst, const ex &loopmom)
 /* MAIN
  */
 
-void
+static void
 usage()
 {
     const char *p = strchr(usagetext, '\n') + 1;
@@ -1123,7 +1066,7 @@ found:
     cout << p;
 }
 
-void
+static void
 main_ufx(const char *specfile)
 {
     parser reader;
@@ -1136,7 +1079,7 @@ main_ufx(const char *specfile)
     cout << "{\n " << uf.first << ",\n " << uf.second << ",\n " << x << "\n}" << endl;
 }
 
-void
+static void
 main_zerosectors(const char *specfile, bool SHORT)
 {
     parser reader;
@@ -1179,7 +1122,7 @@ main_zerosectors(const char *specfile, bool SHORT)
     cout << "\n}" << endl;
 }
 
-void
+static void
 main_symmetrize(const char *specfile, bool def_order, bool compute_mommap)
 {
     parser reader;
