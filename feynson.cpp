@@ -845,7 +845,7 @@ canonical_variable_permutation(const vector<pair<vector<int>, int>> &polybr, uns
     SG_ALLOC(g, 1 + (nx + nterms)*nlayers, 32, "graph malloc");
 #define BEGIN_VERTEX g.v[g.nv] = g.nde; g.d[g.nv] = 0;
 #define ADD_EDGE(vertex) \
-    while (g.nde > g.elen) {DYNREALLOC(int, g.e, g.elen, g.elen*2, "graph realloc");}; \
+    while (g.nde >= g.elen) {DYNREALLOC(int, g.e, g.elen, g.elen*2, "graph realloc");}; \
     g.e[g.nde++] = (vertex); \
     g.d[g.nv]++;
 #define END_VERTEX g.nv++;
