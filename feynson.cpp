@@ -131,8 +131,10 @@ Ss{AUTHORS}
 #include <atomic>
 #include <chrono>
 #include <fstream>
+#include <sstream>
 #include <queue>
 #include <set>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <tuple>
@@ -696,10 +698,6 @@ family_is_zero(const ex &G, const symvector &X)
     }
     matrix eqns(0, K.size() + 1);
     for (auto &&kv : bracket(eqn, X)) {
-        uint64_t sector = 0;
-        for (unsigned i = 0; i < kv.first.size(); i++) {
-            if (kv.first[i] != 0) sector |= 1ul << i;
-        }
         ex c0 = kv.second;
         exvector c(K.size() + 1);
         for (unsigned i = 0; i < K.size(); i++) {

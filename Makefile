@@ -1,13 +1,13 @@
 XCFLAGS=${CFLAGS} \
 	-O0 -g -std=c++14 -pedantic \
 	-Wall -Wextra -Wfatal-errors -Wno-sequence-point \
-	-pipe -fno-omit-frame-pointer -fpermissive \
-	-fdata-sections -ffunction-sections -Wl,--gc-sections
+	-pipe -fno-omit-frame-pointer -fpermissive
 
 XLDFLAGS=${LDFLAGS} \
 	-lginac -lcln -ldl -lgmp -lnauty
 
-XCFLAGS_STATIC=${XCFLAGS} -Os -s -static
+XCFLAGS_STATIC=${XCFLAGS} -Os -s -static \
+	-fdata-sections -ffunction-sections -Wl,--gc-sections
 
 XLDFLAGS_STATIC=${XLDFLAGS}
 
