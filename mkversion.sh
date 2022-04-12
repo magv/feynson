@@ -26,11 +26,18 @@ pkgid_dpkg() {
     printf "%s" "$info" | sed -n '/Version: /{s/^.* //;p}'
 }
 
+pkgid_pkgconf() {
+    info=$(pkg-config --modversion "$1" 2>/dev/null)
+    if [ $? -ne 0 ]; then return 1; fi
+    printf "%s" "$info" | head -1
+}
+
 pkgid() {
     local pkg
     for pkg in "$@"; do
         pkgid_rpm "$pkg" && return
         pkgid_dpkg "$pkg" && return
+        pkgid_pkgconf "$pkg" && return
     done
     echo "unknown"
 }
@@ -39,7 +46,7 @@ cat <<EOF
 static const char VERSION[] = R"(\
 Feynson, $(gitid . 2>/dev/null || hgid .)
 Libraries:
-  Nauty $(pkgid libnauty-dev libnauty nauty)
+  Nauty $(pkgid libnauty2-dev libnauty-dev libnauty nauty)
   GiNaC $(pkgid libginac-dev libginac ginac)
   CLN $(pkgid libcln-dev libcln cln)
   GMP $(pkgid libgmp-dev libgmp gmp)
