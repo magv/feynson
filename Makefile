@@ -1,5 +1,5 @@
 XCFLAGS=${CFLAGS} \
-	-O0 -g -std=c++14 -pedantic \
+	-O3 -g -std=c++14 -pedantic \
 	-Wall -Wextra -Wfatal-errors -Wno-sequence-point \
 	-pipe -fno-omit-frame-pointer -fpermissive
 

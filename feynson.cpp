@@ -338,7 +338,7 @@ log_fmt(const char *pre, const char *post, const char *fmt, const Args &...args)
 template<typename... Args> static inline void
 logd(const char *fmt, const Args &...args)
 {
-    if (VERBOSE) {
+    if (unlikely(VERBOSE)) {
         log_fmt(COLORS ? "\033[2;37m[dbg " : "[dbg ", "] ", fmt, args...);
     }
 }
@@ -387,7 +387,7 @@ struct _scopeexithack {
     _log_depth++; \
     auto __log_f = [&]{ \
         _log_depth--; \
-        if (VERBOSE) { \
+        if (unlikely(VERBOSE)) { \
             auto t = chrono::steady_clock::now(); \
             auto dt = chrono::duration_cast<chrono::duration<double>>(t - __log_t0).count(); \
             logd("< {}(+{}s)",__log_func, dt); \
@@ -1132,12 +1132,15 @@ main_symmetrize(const char *specfile, bool def_order, bool compute_mommap)
     ex productrules = normalize_productrules(input.op(2));
     // Compute the set of all family sizes. We will only be
     // interested in sectors of these sizes.
+    vector<unsigned> familysize;
+    familysize.reserve(families.nops());
     set<unsigned> familysizeset;
     unsigned maxfamilysize = 0;
-    for (auto &&family : families) {
-        unsigned ndens = family.nops();
+    for (unsigned fam = 0; fam < families.nops(); fam++) {
+        unsigned ndens = families.op(fam).nops();
         assert(ndens < 256);
         if (ndens > 0) familysizeset.insert(ndens);
+        familysize.push_back(ndens);
         maxfamilysize = max(maxfamilysize, ndens);
     }
     logd("Family size set: {}", familysizeset);
@@ -1152,7 +1155,7 @@ main_symmetrize(const char *specfile, bool def_order, bool compute_mommap)
     FORK_BEGIN;
         for (unsigned fam = WORKER; fam < families.nops(); fam += JOBS) {
             logd("Preparing family {}", fam + 1);
-            auto &&family  = families[fam];
+            auto &&family  = families.op(fam);
             symvector xi(x.begin(), x.begin() + family.nops());
             auto uf = feynman_uf(family, loopmomenta, productrules, xi);
             auto g = uf.first + uf.second;
@@ -1179,7 +1182,7 @@ main_symmetrize(const char *specfile, bool def_order, bool compute_mommap)
             }
             f << gbrackets.size() << "\n";
             for (auto &&famgbr : gbrackets) {
-                unsigned nx = families[famgbr.first].nops();
+                unsigned nx = familysize[famgbr.first];
                 f << " " << famgbr.first << " " << nx << " " << famgbr.second.size() << "\n";
                 for (auto &&stemcoef : famgbr.second) {
                     f << "  " << stemcoef.second;
@@ -1240,7 +1243,7 @@ main_symmetrize(const char *specfile, bool def_order, bool compute_mommap)
         stable_sort(
             family_order.begin(), family_order.end(),
             [&](unsigned a, unsigned b) -> bool {
-                return families.op(a).nops() > families.op(b).nops();
+                return familysize[a] > familysize[b];
             });
     }
     // Enumerate all the sectors of sizes we are interested in,
@@ -1250,7 +1253,7 @@ main_symmetrize(const char *specfile, bool def_order, bool compute_mommap)
     vector<tuple<unsigned, uint64_t, uint64_t>> sectors;
     for (unsigned i = 0; i < families.nops(); i++) {
         unsigned fam = family_order[i];
-        uint64_t nsectors = 1ul << families[fam].nops();
+        uint64_t nsectors = 1ul << familysize[fam];
         // TODO: these two loops waste time.
         for (unsigned ssize : familysizeset) {
             for (uint64_t sec = 1; sec < nsectors; sec++) {
@@ -1274,7 +1277,7 @@ main_symmetrize(const char *specfile, bool def_order, bool compute_mommap)
     FORK_BEGIN;
         logd("Precomputing canonical polynomials of each family");
         for (unsigned fam = WORKER; fam < families.nops(); fam += JOBS) {
-            unsigned nx = families[fam].nops();
+            unsigned nx = familysize[fam];
             if (nx == 0) continue;
             uint64_t sector = (1ul << nx) - 1;
             uint64_t idx = sector2idx[make_pair(fam, sector)];
@@ -1317,7 +1320,7 @@ main_symmetrize(const char *specfile, bool def_order, bool compute_mommap)
             logd("Computing symmetries for families with {} propagators", *famsize);
             map<hash_t, pair<int, uint64_t>> hash2sector;
             for (unsigned fam = 0; fam < families.nops(); fam += 1) {
-                unsigned nx = families[fam].nops();
+                unsigned nx = familysize[fam];
                 if (nx != *famsize) continue;
                 // Looking at family fam.
                 uint64_t sector = (1ul << nx) - 1;
@@ -1337,28 +1340,28 @@ main_symmetrize(const char *specfile, bool def_order, bool compute_mommap)
                                 fam+1, sector, fam2+1, sec2);
                         uint8_t *perm = canonicalperms + idx*maxfamilysize;
                         uint8_t *perm2 = canonicalperms + idx2*maxfamilysize;
-                        logd("Fam {} is {}, sec {} perm: {}", fam+1, families[fam],
+                        logd("Fam {} is {}, sec {} perm: {}", fam+1, families.op(fam),
                                 sector, vector<uint8_t>(perm, perm+nx));
-                        logd("Fam {} is {}, sec {} perm: {}", fam2+1, families[fam2],
+                        logd("Fam {} is {}, sec {} perm: {}", fam2+1, families.op(fam2),
                                 sec2, vector<uint8_t>(perm2, perm2+nx));
                         if (compute_mommap) {
                             exvector src, dst;
                             for (unsigned i = 0; i < nx; i++) {
                                 int p2i = bitposition(sec2, perm2[i]);
-                                logd("  {} == {}", families[fam][perm[i]], families[fam2][p2i]);
-                                src.push_back(families[fam][perm[i]]);
-                                dst.push_back(families[fam2][p2i]);
+                                logd("  {} == {}", families.op(fam).op(perm[i]), families.op(fam2).op(p2i));
+                                src.push_back(families.op(fam).op(perm[i]));
+                                dst.push_back(families.op(fam2).op(p2i));
                             }
                             auto mommap = find_momenta_map(src, dst, loopmomenta);
                             logd("Mom map: {}", mommap);
                             fam2result[fam] = to_string(mommap);
                         } else {
-                            unsigned nx2 = families[fam2].nops();
+                            unsigned nx2 = familysize[fam2];
                             vector<uint8_t> expr(nx2);
                             for (unsigned i = 0; i < nx; i++) {
                                 int p2i = bitposition(sec2, perm2[i]);
                                 logd("  fam{} #{} == fam{} #{}", fam+1, perm[i]+1, fam2+1, p2i+1);
-                                logd("  {} == {}", families[fam][perm[i]], families[fam2][p2i]);
+                                logd("  {} == {}", families.op(fam).op(perm[i]), families.op(fam2).op(p2i));
                                 expr[p2i] = perm[i]+1;
                             }
                             ostringstream s;
@@ -1386,7 +1389,7 @@ main_symmetrize(const char *specfile, bool def_order, bool compute_mommap)
                     if (bitcount(sec2) != nx) continue;
                     if (fully_mapped[fam2]) continue;
                     if (!hash_done[idx2]) {
-                        unsigned nx2 = families[fam2].nops();
+                        unsigned nx2 = familysize[fam2];
                         auto br2 = subsector_bracket(gbrackets[fam2], nx2, sec2);
                         auto perm = canonical_variable_permutation(br2, nx);
                         memcpy(canonicalperms + idx2*maxfamilysize, &perm[0], nx);
@@ -1410,28 +1413,28 @@ main_symmetrize(const char *specfile, bool def_order, bool compute_mommap)
                                 fam+1, sector, fam2+1, sec2);
                         uint8_t *perm = canonicalperms + idx*maxfamilysize;
                         uint8_t *perm2 = canonicalperms + idx2*maxfamilysize;
-                        logd("Fam {} is {}, sec {} perm: {}", fam+1, families[fam],
+                        logd("Fam {} is {}, sec {} perm: {}", fam+1, families.op(fam),
                                 sector, vector<uint8_t>(perm, perm+nx));
-                        logd("Fam {} is {}, sec {} perm: {}", fam2+1, families[fam2],
+                        logd("Fam {} is {}, sec {} perm: {}", fam2+1, families.op(fam2),
                                 sec2, vector<uint8_t>(perm2, perm2+nx));
                         if (compute_mommap) {
                             exvector src, dst;
                             for (unsigned i = 0; i < nx; i++) {
                                 int p2i = bitposition(sec2, perm2[i]);
-                                logd("  {} == {}", families[fam][perm[i]], families[fam2][p2i]);
-                                src.push_back(families[fam][perm[i]]);
-                                dst.push_back(families[fam2][p2i]);
+                                logd("  {} == {}", families.op(fam).op(perm[i]), families.op(fam2).op(p2i));
+                                src.push_back(families.op(fam).op(perm[i]));
+                                dst.push_back(families.op(fam2).op(p2i));
                             }
                             auto mommap = find_momenta_map(src, dst, loopmomenta);
                             logd("Mom map: {}", mommap);
                             fam2result[fam] = to_string(mommap);
                         } else {
-                            unsigned nx2 = families[fam2].nops();
+                            unsigned nx2 = familysize[fam2];
                             vector<uint8_t> expr(nx2);
                             for (unsigned i = 0; i < nx; i++) {
                                 int p2i = bitposition(sec2, perm2[i]);
                                 logd("  fam{} #{} == fam{} #{}", fam+1, perm[i]+1, fam2+1, p2i+1);
-                                logd("  {} == {}", families[fam][perm[i]], families[fam2][p2i]);
+                                logd("  {} == {}", families.op(fam).op(perm[i]), families.op(fam2).op(p2i));
                                 expr[p2i] = perm[i]+1;
                             }
                             ostringstream s;
@@ -1552,4 +1555,5 @@ main(int argc, char *argv[])
              << "' (use -h to see usage)" << endl;
         return 1;
     }
+    return 0;
 }
