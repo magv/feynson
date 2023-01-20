@@ -44,7 +44,7 @@ need UPX [3], and the static versions of GiNaC and Nauty libraries
 
 ## COMMANDS
 
-* `feynson` **symmetrize** *spec-file*
+* `feynson` **symmetrize** [`-d`] *spec-file*
 
   Print a list of momenta substitutions that make symmetries
   between a list of integral families explicit.
@@ -84,7 +84,7 @@ need UPX [3], and the static versions of GiNaC and Nauty libraries
   invariant substitution rules set to `{}`, and to fall back
   to **mapping-rules** otherwise.
 
-* `feynson` **mapping-rules** *spec-file*
+* `feynson` **mapping-rules** [`-d`] *spec-file*
 
   Same as **symmetrize**, but instead of printing the loop
   momenta substitutions, produce explicit rules of mapping
@@ -118,9 +118,9 @@ need UPX [3], and the static versions of GiNaC and Nauty libraries
   are the indices of denominators that belong to this
   sector (counting from 1).
 
-  If the `-s` flag is given, the output will be shortened
-  by only listing the topmost zero sectors: all the remaining
-  zero sectors are their subsectors.
+  If the `-s` ("short") flag is given, the output will
+  be shortened by only listing the topmost zero sectors:
+  all the remaining zero sectors are their subsectors.
 
   Every sector that is missing a cut propagator of its
   supersectors will be reported as zero.
@@ -155,7 +155,7 @@ need UPX [3], and the static versions of GiNaC and Nauty libraries
 
 * `-s`
 
-  Shorten the output (depending on the command).
+  Shorten the output (in **zero-sectors** and **minimize-family**).
 
 * `-q`
 

@@ -8,7 +8,7 @@ Ss{SYNOPSYS}
 Ss{DESCRIPTION}
 
 Ss{COMMANDS}
-    Nm{feynson} Cm{symmetrize} Ar{spec-file}
+    Nm{feynson} Cm{symmetrize} [Fl{-d}] Ar{spec-file}
         Print a list of momenta substitutions that make symmetries
         between a list of integral families explicit.
 
@@ -47,7 +47,7 @@ Ss{COMMANDS}
         invariant substitution rules set to Ql[{}], and to fall back
         to Cm{mapping-rules} otherwise.
 
-    Nm{feynson} Cm{mapping-rules} Ar{spec-file}
+    Nm{feynson} Cm{mapping-rules} [Fl{-d}] Ar{spec-file}
 
         Same as Cm{symmetrize}, but instead of printing the loop
         momenta substitutions, produce explicit rules of mapping
@@ -80,9 +80,9 @@ Ss{COMMANDS}
         are the indices of denominators that belong to this
         sector (counting from 1).
 
-        If the Fl{-s} flag is given, the output will be shortened
-        by only listing the topmost zero sectors: all the remaining
-        zero sectors are their subsectors.
+        If the Fl{-s} ("short") flag is given, the output will
+        be shortened by only listing the topmost zero sectors:
+        all the remaining zero sectors are their subsectors.
 
         Every sector that is missing a cut propagator of its
         supersectors will be reported as zero.
@@ -107,7 +107,7 @@ Ss{COMMANDS}
 Ss{OPTIONS}
     Fl{-j} Ar{jobs}    Parallelize calculations using at most this many workers.
     Fl{-d}         Prioritize families in the definition order, irrespective of size.
-    Fl{-s}         Shorten the output (depending on the command).
+    Fl{-s}         Shorten the output (in Cm{zero-sectors} and Cm{minimize-family}).
     Fl{-q}         Print a more quiet log.
     Fl{-h}         Show this help message.
     Fl{-V}         Print version information.
