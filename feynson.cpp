@@ -859,9 +859,9 @@ canonical_variable_permutation(const vector<pair<vector<int>, int>> &polybr, uns
         }
         k++;
     }
-    DYNALLSTAT(int, lab, lab_sz);
-    DYNALLSTAT(int, ptn, ptn_sz);
-    DYNALLSTAT(int, orbits, orbits_sz);
+    int *lab = NULL; size_t lab_sz = 0;
+    int *ptn = NULL; size_t ptn_sz = 0;
+    int *orbits = NULL; size_t orbits_sz = 0;
     DYNALLOC1(int, lab, lab_sz, g.nv, "malloc");
     DYNALLOC1(int, ptn, ptn_sz, g.nv, "malloc");
     DYNALLOC1(int, orbits, orbits_sz, g.nv, "malloc");
@@ -896,7 +896,7 @@ canonical_variable_permutation(const vector<pair<vector<int>, int>> &polybr, uns
     }
     assert(partidx == g.nv);
     SG_DECL(cg);
-    static DEFAULTOPTIONS_SPARSEGRAPH(options);
+    DEFAULTOPTIONS_SPARSEGRAPH(options);
     options.defaultptn = FALSE;
     options.getcanon = TRUE;
     statsblk stats;
@@ -909,6 +909,7 @@ canonical_variable_permutation(const vector<pair<vector<int>, int>> &polybr, uns
     }
     DYNFREE(lab, lab_sz);
     DYNFREE(ptn, ptn_sz);
+    DYNFREE(orbits, orbits_sz);
     return result;
 }
 
