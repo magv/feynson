@@ -634,12 +634,8 @@ feynman_uf(const ex &denominators, const ex &loopmom, const ex &sprules, const s
         A = A.add(a.mul_scalar(X[d]));
         B = B.add(b.mul_scalar(X[d]/2));
         C += X[d]*D;
-        if (!has_a) {
-            if (has_b) {
-                loge("feynman_uf(): denominator #{} (={}) is linear in the loop momenta", d+1, dens.op(d));
-            } else {
-                loge("feynman_uf(): denominator #{} (={}) is free of the loop momenta", d+1, dens.op(d));
-            }
+        if (!has_a && !has_b) {
+            loge("feynman_uf(): denominator #{} (={}) is free of the loop momenta", d+1, dens.op(d));
             exit(1);
         }
     }
