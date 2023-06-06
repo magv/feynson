@@ -57,3 +57,21 @@ FailUnless[
 FailUnless[
   Feynson["mapping-rules -q -", { {{(q-l)^2, l^2}, {(q+l)^2, l^2}}, {l}, {} }] ===
   {{}, {1, {1, 2}}}]
+
+FailUnless[
+  Feynson["symmetrize -q -", {{
+      {(l-p1)^2, (l+p2)^2},
+      {(l)^2, (l+p1+p2)^2},
+      {(l)^2, (l-p1)^2, (l-p1-p2)^2},
+      {(l)^2, (l-p2)^2, (l-p1-p2)^2}
+    }, {l}, {} }] ===
+  {{{l, -l+p1}}, {{l, -l}}, {}, {{l, -l + p1 + p2}}}]
+
+FailUnless[
+  Feynson["symmetrize -q -d -", {{
+      {(l-p1)^2, (l+p2)^2},
+      {(l)^2, (l+p1+p2)^2},
+      {(l)^2, (l-p1)^2, (l-p1-p2)^2},
+      {(l)^2, (l-p2)^2, (l-p1-p2)^2}
+    }, {l}, {} }] ===
+  {{}, {{l, l-p1}}, {}, {{l, -l + p1 + p2}}}]
