@@ -11,6 +11,8 @@ XCFLAGS_STATIC=${XCFLAGS} -Os -s -static \
 
 XLDFLAGS_STATIC=${XLDFLAGS}
 
+MATH?=math
+
 all: feynson
 
 feynson: feynson.cpp ginacutils.cpp blake2b.c
@@ -27,7 +29,10 @@ README.md: feynson.cpp mkmanual.sh
 	./mkmanual.sh >>$@.tmp <$<
 	mv $@.tmp $@
 
-clean:
+test: feynson phony
+	${MATH} -script test.m
+
+clean: phony
 	rm -f feynson feynson.static version.h
 
 phony:;
