@@ -11,24 +11,35 @@ is ready for an IBP solver. Additionally, not all IBP solvers
 are optimized to receive thousands of (mostly redundant) integral
 families; *Feynson* is.
 
+*Feynson* was first introduced and described in the author’s
+Ph.D. thesis [1], please refer to it for more implementations
+details.
+
+[1] https://inspirehep.net/literature/2177952
+
 # BUILDING
 
-To build *Feynson*, first install GiNaC [1] and Nauty [2]
+To build *Feynson*, first install GiNaC [2] and Nauty [3]
 libraries, and then run:
 
     make
 
 A static binary of *Feynson* can also be built. For this you will
-need UPX [3], and the static versions of GiNaC and Nauty libraries
+need UPX [4], and the static versions of GiNaC and Nauty libraries
 (as well as their dependencies). Once those are ready, run:
 
     make feynson.static
 
-[1] https://www.ginac.de/
+Alternatively it is possible to use Hepware [5] to build *Feynson*
+together with all the dependencies.
 
-[2] https://pallini.di.uniroma1.it/
+[2] https://www.ginac.de/
 
-[3] https://upx.github.io/
+[3] https://pallini.di.uniroma1.it/
+
+[4] https://upx.github.io/
+
+[5] https://github.com/magv/hepware
 
 # MANUAL
 
