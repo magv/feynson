@@ -104,6 +104,26 @@ Ss{COMMANDS}
         the F polynomial, and the list of Feynman parameter
         variables.
 
+    Nm{feynson} Cm{canonicalize-polynomials} Ar{spec-file}
+        Compute canonical permutations of a list of polynomials.
+
+        The input specification file should be a list of two
+        elements:
+        1) a list of all polynomial variables, e.g. Ql[{x1, x2, x3}];
+        2) a list of all polynomials.
+
+        For example: Ql[{ {x1, x2}, {x1+2*x2, x2+2*x1} }].
+
+        The output will be a list, where for each input polynomial
+        there will be a list of three elements:
+        1) a string hash, uniquely identifying the canonical
+           form of the polynomial;
+        2) the canonical permutation of the polynomial variables,
+           which is a list of indices, such that the replacement
+           of each Ql{variable[permutation[i]]} into Ql{variable[i]} puts
+           the corresponding polynomial into its canonical form;
+        3) the canonical form itself.
+
 Ss{OPTIONS}
     Fl{-j} Ar{jobs}    Parallelize calculations using at most this many workers.
     Fl{-d}         Prioritize families in the definition order, irrespective of size.
@@ -1178,10 +1198,10 @@ main_symmetrize(const char *specfile, bool def_order, bool compute_mommap)
                 f << " " << coefid.second << " " << coefid.first << "\n";
             }
             f << gbrackets.size() << "\n";
-            for (auto &&famgbr : gbrackets) {
-                unsigned nx = familysize[famgbr.first];
-                f << " " << famgbr.first << " " << nx << " " << famgbr.second.size() << "\n";
-                for (auto &&stemcoef : famgbr.second) {
+            for (auto &&gbr : gbrackets) {
+                unsigned nx = familysize[gbr.first];
+                f << " " << gbr.first << " " << nx << " " << gbr.second.size() << "\n";
+                for (auto &&stemcoef : gbr.second) {
                     f << "  " << stemcoef.second;
                     for (unsigned i = 0; i < nx; i++) {
                         f << " " << stemcoef.first[i];
@@ -1266,8 +1286,8 @@ main_symmetrize(const char *specfile, bool def_order, bool compute_mommap)
     // sectors (those with largest number of propagators).
     uint64_t totalsectors = sector2idx.size();
     logd("Total interesting sectors: {}", sector2idx.size());
-    hash_t *canonicalhashes = (hash_t*)shared_alloc(sizeof(hash_t) * totalsectors);
-    uint8_t *canonicalperms = (uint8_t*)shared_alloc(maxfamilysize * sizeof(uint8_t) * totalsectors);
+    hash_t *canonical_hashes = (hash_t*)shared_alloc(sizeof(hash_t) * totalsectors);
+    uint8_t *canonical_perms = (uint8_t*)shared_alloc(maxfamilysize * sizeof(uint8_t) * totalsectors);
     uint8_t *hash_done = (uint8_t*)shared_alloc(sizeof(uint8_t) * totalsectors);
     uint8_t *fully_mapped = (uint8_t*)shared_alloc(sizeof(uint8_t) * totalsectors);
     atomic<int> *hashes_done = (atomic<int> *)shared_alloc(sizeof(atomic<int> *));
@@ -1280,15 +1300,15 @@ main_symmetrize(const char *specfile, bool def_order, bool compute_mommap)
             uint64_t idx = sector2idx[make_pair(fam, sector)];
             assert(!hash_done[idx]);
             auto perm = canonical_variable_permutation(gbrackets[fam], nx);
-            memcpy(canonicalperms + idx*maxfamilysize, &perm[0], nx);
+            memcpy(canonical_perms + idx*maxfamilysize, &perm[0], nx);
             hash_t h = canonical_hash(gbrackets[fam], nx, perm);
-            canonicalhashes[idx] = h;
+            canonical_hashes[idx] = h;
             // "Release"-ordered fence. This prevents any preceding
             // reads or writes from being ordered past
             // any subsequent writes.
             // We need this so that any thread observing
             // hash_done to be 1 would also observe
-            // canonicalhashes to be of correct value.
+            // canonical_hashes to be of correct value.
             // On x86 this is only an instruction for the
             // compiler not to reorder memory access across
             // this line; the hardware does not do this sort
@@ -1325,9 +1345,9 @@ main_symmetrize(const char *specfile, bool def_order, bool compute_mommap)
                 assert(hash_done[idx]);
                 if (1) {
                     // Check if the sector hash was already seen
-                    // and put into canonicalhashes. This is an
+                    // and put into canonical_hashes. This is an
                     // optional speedup.
-                    auto secit = hash2sector.find(canonicalhashes[idx]);
+                    auto secit = hash2sector.find(canonical_hashes[idx]);
                     if (secit != hash2sector.end()) {
                         int fam2 = secit->second.first;
                         uint64_t sec2 = secit->second.second;
@@ -1335,8 +1355,8 @@ main_symmetrize(const char *specfile, bool def_order, bool compute_mommap)
                         fully_mapped[fam] = true;
                         logi("Family {} (top sector {}) is symmetric to family {}, sector {}",
                                 fam+1, sector, fam2+1, sec2);
-                        uint8_t *perm = canonicalperms + idx*maxfamilysize;
-                        uint8_t *perm2 = canonicalperms + idx2*maxfamilysize;
+                        uint8_t *perm = canonical_perms + idx*maxfamilysize;
+                        uint8_t *perm2 = canonical_perms + idx2*maxfamilysize;
                         logd("Fam {} is {}, sec {} perm: {}", fam+1, families.op(fam),
                                 sector, vector<uint8_t>(perm, perm+nx));
                         logd("Fam {} is {}, sec {} perm: {}", fam2+1, families.op(fam2),
@@ -1389,9 +1409,9 @@ main_symmetrize(const char *specfile, bool def_order, bool compute_mommap)
                         unsigned nx2 = familysize[fam2];
                         auto br2 = subsector_bracket(gbrackets[fam2], nx2, sec2);
                         auto perm = canonical_variable_permutation(br2, nx);
-                        memcpy(canonicalperms + idx2*maxfamilysize, &perm[0], nx);
+                        memcpy(canonical_perms + idx2*maxfamilysize, &perm[0], nx);
                         hash_t h = canonical_hash(br2, nx, perm);
-                        canonicalhashes[idx2] = h;
+                        canonical_hashes[idx2] = h;
                         atomic_thread_fence(memory_order_release);
                         hash_done[idx2] = true;
                         hashes_done->fetch_add(1, memory_order_relaxed);
@@ -1401,15 +1421,15 @@ main_symmetrize(const char *specfile, bool def_order, bool compute_mommap)
                     // any following reads or writes to be ordered
                     // before any preceeding reads.
                     // We need this here so that the following reads from
-                    // canonicalhashes would not be reordered before the
+                    // canonical_hashes would not be reordered before the
                     // read of hash_done above -- unlikely as it is.
                     atomic_thread_fence(memory_order_acquire);
-                    if (canonicalhashes[idx] == canonicalhashes[idx2]) {
+                    if (canonical_hashes[idx] == canonical_hashes[idx2]) {
                         fully_mapped[fam] = true;
                         logi("Family {} (top sector {}) is symmetric to family {}, sector {}",
                                 fam+1, sector, fam2+1, sec2);
-                        uint8_t *perm = canonicalperms + idx*maxfamilysize;
-                        uint8_t *perm2 = canonicalperms + idx2*maxfamilysize;
+                        uint8_t *perm = canonical_perms + idx*maxfamilysize;
+                        uint8_t *perm2 = canonical_perms + idx2*maxfamilysize;
                         logd("Fam {} is {}, sec {} perm: {}", fam+1, families.op(fam),
                                 sector, vector<uint8_t>(perm, perm+nx));
                         logd("Fam {} is {}, sec {} perm: {}", fam2+1, families.op(fam2),
@@ -1448,7 +1468,7 @@ main_symmetrize(const char *specfile, bool def_order, bool compute_mommap)
                     }
                 }
                 logi("Family {} (top sector {}) is unique", fam+1, sector);
-                hash2sector[canonicalhashes[idx]] = make_pair(fam, sector);
+                hash2sector[canonical_hashes[idx]] = make_pair(fam, sector);
             found:;
             }
             // Skip JOBS sizes.
@@ -1482,8 +1502,8 @@ main_symmetrize(const char *specfile, bool def_order, bool compute_mommap)
     }
     logd("Canonized {} sectors out of {}, {}% of hashes wasted",
         ndone, totalsectors, (hashes_done->load() - ndone)*100/(max(hashes_done->load(), 1)));
-    shared_free(canonicalperms, maxfamilysize * sizeof(uint8_t) * totalsectors);
-    shared_free(canonicalhashes, sizeof(hash_t) * totalsectors);
+    shared_free(canonical_perms, maxfamilysize * sizeof(uint8_t) * totalsectors);
+    shared_free(canonical_hashes, sizeof(hash_t) * totalsectors);
     shared_free(hash_done, sizeof(uint8_t) * totalsectors);
     shared_free(fully_mapped, sizeof(uint8_t) * totalsectors);
     cout << "{";
@@ -1498,6 +1518,144 @@ main_symmetrize(const char *specfile, bool def_order, bool compute_mommap)
         }
     }
     cout << "\n}\n";
+}
+
+static void
+main_canonicalize_polynomials(const char *specfile)
+{
+    parser reader;
+    ex input = readfile(specfile, reader);
+    ex variables = input.op(0);
+    ex polynomials = input.op(1);
+    unsigned nx = variables.nops();
+    unsigned npolynomials = polynomials.nops();
+    symvector xi(nx);
+    for (unsigned i = 0; i < nx; i++) {
+        const ex &var = variables.op(i);
+        if (is_a<symbol>(var)) {
+            xi[i] = ex_to<symbol>(var);
+        } else {
+            loge("Not a symbol: '{}'", var);
+            exit(1);
+        }
+    }
+    // Compute the brackets forms of all polynomials.
+    map<ex, int, ex_is_less> coef2uniqid;
+    map<int, vector<pair<vector<int>, int>>> gbrackets;
+    if (FORK) {
+        tmpdir::create("feynson");
+    }
+    FORK_BEGIN;
+        for (unsigned polyidx = WORKER; polyidx < npolynomials; polyidx += JOBS) {
+            auto br = bracket(polynomials.op(polyidx), xi);
+            for (auto &&stemcoef : br) {
+                auto &&it = coef2uniqid.find(stemcoef.second);
+                if (it == coef2uniqid.end()) {
+                    logd("Unique coefficient C{} = {}", coef2uniqid.size(), stemcoef.second);
+                    coef2uniqid[stemcoef.second] = coef2uniqid.size();
+                }
+            }
+            vector<pair<vector<int>, int>> gbr;
+            for (auto &&stemcoef : br) {
+                gbr.push_back(make_pair(stemcoef.first, coef2uniqid[stemcoef.second]));
+            }
+            gbrackets[polyidx] = gbr;
+        }
+        if (FORK) {
+            logd("Exporting results");
+            ofstream f(tmpdir::filename(WORKER));
+            f << coef2uniqid.size() << "\n";
+            for (auto &&coefid : coef2uniqid) {
+                f << " " << coefid.second << " " << coefid.first << "\n";
+            }
+            f << gbrackets.size() << "\n";
+            for (auto &&gbr : gbrackets) {
+                f << " " << gbr.first << " " << gbr.second.size() << "\n";
+                for (auto &&stemcoef : gbr.second) {
+                    f << "  " << stemcoef.second;
+                    for (unsigned i = 0; i < nx; i++) {
+                        f << " " << stemcoef.first[i];
+                    }
+                    f << "\n";
+                }
+            }
+            logd("Export done");
+        }
+    FORK_END;
+    if (FORK) {
+        logd("Loading & combining worker outputs");
+        for (int worker = 0; worker < JOBS; worker++) {
+            ifstream f(tmpdir::filename(worker));
+            int nc; f >> nc;
+            map<int, int> cidmap;
+            for (int i = 0; i < nc; i++) {
+                int id; f >> id;
+                string line; f >> ws; getline(f, line);
+                ex coef = reader(line);
+                auto it = coef2uniqid.find(coef);
+                if (it == coef2uniqid.end()) {
+                    logd("Unique coefficient C{} = W{}.C{} = {}",
+                            coef2uniqid.size(), worker, id, coef);
+                    coef2uniqid[coef] = cidmap[id] = coef2uniqid.size();
+                } else {
+                    logd("Known coefficient C{} = W{}.C{} = ", it->second, worker, id, coef);
+                    cidmap[id] = it->second;
+                }
+            }
+            int npolys; f >> npolys;
+            for (int i = 0; i < npolys; i++) {
+                int polyidx; f >> polyidx;
+                int nterms; f >> nterms;
+                vector<pair<vector<int>, int>> br;
+                for (int t = 0; t < nterms; t++) {
+                    int coefid; f >> coefid;
+                    vector<int> stem(nx);
+                    for (unsigned x = 0; x < nx; x++) {
+                        int p; f >> p;
+                        stem[x] = p;
+                    }
+                    br.push_back(make_pair(stem, cidmap[coefid]));
+                }
+                gbrackets[polyidx] = br;
+            }
+        }
+        logd("Done combining output");
+        tmpdir::remove();
+    }
+    // Compute canonical permutations and hashes for top-level
+    // sectors (those with largest number of propagators).
+    hash_t *canonical_hashes = (hash_t*)shared_alloc(sizeof(hash_t) * npolynomials);
+    uint8_t *canonical_perms = (uint8_t*)shared_alloc(nx * sizeof(uint8_t) * npolynomials);
+    FORK_BEGIN;
+        logd("Precomputing canonical polynomials of each family");
+        for (unsigned polyidx = WORKER; polyidx < npolynomials; polyidx += JOBS) {
+            auto perm = canonical_variable_permutation(gbrackets[polyidx], nx);
+            memcpy(canonical_perms + polyidx*nx, &perm[0], nx);
+            hash_t h = canonical_hash(gbrackets[polyidx], nx, perm);
+            canonical_hashes[polyidx] = h;
+            logd("Polynomial {} is {}", polyidx+1, h);
+        }
+    FORK_END;
+    cout << "{";
+    for (unsigned polyidx = 0; polyidx < npolynomials; polyidx++) {
+        if (polyidx == 0) { cout << "\n "; }
+        else { cout << ",\n "; }
+        hash_t h = canonical_hashes[polyidx];
+        uint8_t *perm = canonical_perms + polyidx*nx;
+        exmap perm_map;
+        for (unsigned i = 0; i < nx; i++) {
+            perm_map[xi[perm[i]]] = xi[i];
+        }
+        cout << "{\"" << h << "\", {";
+        for (unsigned i = 0; i < nx; i++) {
+            if (i != 0) { cout << ", "; }
+            cout << (int)perm[i];
+        }
+        cout << "}, " << polynomials.op(polyidx).subs(perm_map) << "}";
+    }
+    cout << "\n}\n";
+    shared_free(canonical_perms, nx * sizeof(uint8_t) * npolynomials);
+    shared_free(canonical_hashes, sizeof(hash_t) * npolynomials);
 }
 
 #define IFCMD(name, condition) \
@@ -1541,6 +1699,9 @@ main(int argc, char *argv[])
     }
     else IFCMD("mapping-rules", argc == 2) {
         main_symmetrize(argv[1], DEF_ORDER, false);
+    }
+    else IFCMD("canonicalize-polynomials", argc == 2) {
+        main_canonicalize_polynomials(argv[1]);
     }
     else if (argc == 0) {
         cerr << "feynson: no command provided (use -h to see usage)" << endl;
