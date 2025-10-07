@@ -154,6 +154,27 @@ together with all the dependencies.
   the F polynomial, and the list of Feynman parameter
   variables.
 
+* `feynson` **canonicalize-polynomials** *spec-file*
+
+  Compute canonical permutations of a list of polynomials.
+
+  The input specification file should be a list of two
+  elements:
+  1) a list of all polynomial variables, e.g. `{x1, x2, x3}`;
+  2) a list of all polynomials.
+
+  For example: `{ {x1, x2}, {x1+2*x2, x2+2*x1} }`.
+
+  The output will be a list, where for each input polynomial
+  there will be a list of three elements:
+  1) a string hash, uniquely identifying the canonical
+     form of the polynomial;
+  2) the canonical permutation of the polynomial variables,
+     which is a list of indices, such that the replacement
+     of each `variable[permutation[i]]` into `variable[i]` puts
+     the corresponding polynomial into its canonical form;
+  3) the canonical form itself.
+
 ## OPTIONS
 
 * `-j` *jobs*
