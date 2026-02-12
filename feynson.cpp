@@ -957,6 +957,8 @@ canonical_hash(const vector<pair<vector<int>, int>> &polybr, unsigned nx, vector
     return result;
 }
 
+class NonLinear : public std::exception {};
+
 static exvector
 lincoefficients(const ex &expr, const symvector &vars)
 {
@@ -965,10 +967,12 @@ lincoefficients(const ex &expr, const symvector &vars)
     ex restofexpr = expr;
     for (unsigned i = 0; i < vars.size(); i++) {
         if (restofexpr.degree(vars[i]) > 1) {
-            loge("lincoefficients: {} is not linear in {}", expr, vars[i]);
-            exit(1);
+            throw NonLinear();
         }
         ex c = restofexpr.coeff(vars[i]);
+        for (unsigned j = i + 1; j < vars.size(); j++) {
+            if (c.has(vars[j])) throw NonLinear();
+        }
         coefs.push_back(c);
         restofexpr = restofexpr - c*vars[i];
     }
@@ -987,16 +991,28 @@ find_momenta_map(const exvector &src, const exvector &dst, const ex &loopmom)
         newloopmommap[loopmom.op(i)] = newl[i];
     }
     vector<vector<exvector>> eqnsets;
+    exvector nonlinear_eqns;
     for (unsigned i = 0; i < src.size(); i++) {
         ex eq = src[i].subs(newloopmommap) - dst[i];
         vector<exvector> eqns;
         factor_iter(factor(eq), [&](const ex &factor, int power) {
             (void)power;
             if (is_a<numeric>(factor)) return;
-            eqns.push_back(lincoefficients(factor, newl));
+            try {
+                eqns.push_back(lincoefficients(factor, newl));
+            } catch (const NonLinear &e) {
+                // We can't really solve nonlinear equations, but
+                // in a subset of cases it is enough to postpone
+                // them till the end, and they are automatically
+                // satisfied with the map found otherwise.
+                logd("Equation {} is nonlinear in {}; we'll postpone it", factor, newl);
+                nonlinear_eqns.push_back(factor);
+            }
         });
-        sort(eqns.begin(), eqns.end());
-        eqnsets.push_back(eqns);
+        if (eqns.size() > 0) {
+            sort(eqns.begin(), eqns.end());
+            eqnsets.push_back(eqns);
+        }
     }
     sort(eqnsets.begin(), eqnsets.end());
     vector<unsigned> eqnum(eqnsets.size());
@@ -1007,6 +1023,9 @@ find_momenta_map(const exvector &src, const exvector &dst, const ex &loopmom)
         auto mx = mxstack.top();
         // The first eqset equations are chosen and are compatible.
         // Choose the next one.
+        assert(eqset < eqnsets.size());
+        assert(eqset < eqnum.size());
+        assert(eqnum[eqset] < eqnsets[eqset].size());
         mx.add_row(eqnsets[eqset][eqnum[eqset]]);
         mx.normalize();
         bool lastrowiszero = true;
@@ -1043,6 +1062,19 @@ find_momenta_map(const exvector &src, const exvector &dst, const ex &loopmom)
     for (unsigned i = 0; i < loopmom.nops(); i++) {
         if (!loopmom.op(i).is_equal(sol(i, 0))) {
             result.append(lst{loopmom.op(i), sol(i, 0)});
+        }
+    }
+    if (nonlinear_eqns.size() > 0) {
+        logd("Will double-check {} remaining nonlinear equations", nonlinear_eqns.size());
+        exmap newl_map;
+        for (unsigned i = 0; i < loopmom.nops(); i++) {
+            newl_map[newl[i]] = sol(i, 0);
+        }
+        for (auto &eq : nonlinear_eqns) {
+            if (!eq.subs(newl_map).normal().is_zero()) {
+                loge("Equation {} is not zero under the map: {}", eq, newl_map);
+                exit(1);
+            }
         }
     }
     return result;
