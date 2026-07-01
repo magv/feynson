@@ -185,6 +185,7 @@ static int JOBS = 1;
 static int WORKER = -1;
 
 typedef vector<symbol> symvector;
+typedef set<symbol, ex_is_less> symbolset;
 struct hash_t { uint8_t hash[32]; };
 
 static inline bool
@@ -677,7 +678,6 @@ feynman_uf(const ex &denominators, const ex &loopmom, const ex &sprules, const s
 static map<vector<int>, ex>
 bracket(const ex &expr, const symvector &X)
 {
-    LOGME;
     map<vector<int>, ex> result;
     map<ex, int, ex_is_less> sym2id;
     for (unsigned i = 0; i < X.size(); i++) {
@@ -701,6 +701,74 @@ bracket(const ex &expr, const symvector &X)
         result[stemidx] += mul(coef);
     });
     return result;
+}
+
+/* Find all symbols in an expression.
+ */
+static void
+find_symbols(symbolset &symbols, const ex &e)
+{
+    if (is_a<symbol>(e)) {
+        symbols.insert(ex_to<symbol>(e));
+    } else {
+        for (unsigned i = 0; i < e.nops(); i++)
+            find_symbols(symbols, e.op(i));
+    }
+}
+
+/* Print an expression in a canonical rational form. The point
+ * of this form is that it is independent of GiNaC expression
+ * ordering (which changes every program execution).
+ */
+static void
+print_canonical_form(ostream &o, const ex &e)
+{
+    // Find all symbols & order them.
+    symbolset var_set;
+    find_symbols(var_set, e);
+    symvector var_list(var_set.begin(), var_set.end());
+    sort(var_list.begin(), var_list.end(), [](const symbol &a, const symbol &b) {
+        return a.get_name() < b.get_name();
+    });
+    logd("Symbols: {}", var_list);
+    // Normalize rational expression.
+    ex nd = e.normal().numer_denom();
+    map<vector<int>, ex> num = bracket(nd.op(0), var_list);
+    map<vector<int>, ex> den = bracket(nd.op(1), var_list);
+    vector<vector<int>> num_keys;
+    vector<vector<int>> den_keys;
+    for(const auto &it : num) num_keys.push_back(it.first);
+    for(const auto &it : den) den_keys.push_back(it.first);
+    sort(num_keys.begin(), num_keys.end());
+    sort(den_keys.begin(), den_keys.end());
+    // Output, dividing out the leading coefficient.
+    ex numc = num[num_keys[0]];
+    ex denc = den[den_keys[0]];
+    o << numc/denc << "*(";
+    for (const auto &key : num_keys) {
+        if (&key != &num_keys[0]) o << '+';
+        o << num[key]/numc;
+        for (size_t i = 0; i < var_list.size(); i++) {
+            int p = key[i];
+            if (p != 0) {
+                o << '*' << var_list[i];
+                if (p != 1) o << '^' << p;
+            }
+        }
+    }
+    o << ")/(";
+    for (const auto &key : den_keys) {
+        if (&key != &den_keys[0]) o << '+';
+        o << den[key]/denc;
+        for (size_t i = 0; i < var_list.size(); i++) {
+            int p = key[i];
+            if (p != 0) {
+                o << '*' << var_list[i];
+                if (p != 1) o << '^' << p;
+            }
+        }
+    }
+    o << ')';
 }
 
 static vector<bool>
@@ -1080,6 +1148,37 @@ find_momenta_map(const exvector &src, const exvector &dst, const ex &loopmom)
     return result;
 }
 
+/* Sort all coefficients in the canonical order. Update coefficient
+ * ids in brackets to this order.
+ */
+static void
+sort_in_canonical_order(map<int, vector<pair<vector<int>, int>>> &gbrackets,
+                  const map<ex, int, ex_is_less> &coef2uniqid)
+{
+    vector<pair<string, int>> coefs;
+    for (auto &&kv : coef2uniqid) {
+        ostringstream s;
+        print_canonical_form(s, kv.first);
+        coefs.emplace_back(s.str(), kv.second);
+    }
+    sort(coefs.begin(), coefs.end(), [](const auto &a, const auto &b) {
+        return get<0>(a) < get<0>(b);
+    });
+    vector<int> idmap(coef2uniqid.size());
+    for (unsigned i = 0; i < coefs.size(); i++) {
+        logd("Canonical-order coefficient Can{} = C{} = {}",
+             i,
+             get<1>(coefs[i]),
+             get<0>(coefs[i]));
+        idmap[get<1>(coefs[i])] = i;
+    }
+    for (auto &&gbr : gbrackets) {
+        for (auto &&stemcoef : gbr.second) {
+            stemcoef.second = idmap[stemcoef.second];
+        }
+    }
+}
+
 /* MAIN
  */
 
@@ -1285,6 +1384,8 @@ main_symmetrize(const char *specfile, bool def_order, bool compute_mommap)
         logd("Done combining output");
         tmpdir::remove();
     }
+    // Sort all coefficients in the canonical order.
+    sort_in_canonical_order(gbrackets, coef2uniqid);
     // Family indices in the order of decreasing family size;
     vector<unsigned> family_order(families.nops());
     for (unsigned i = 0; i < families.nops(); i++) family_order[i] = i;
@@ -1654,6 +1755,8 @@ main_canonicalize_polynomials(const char *specfile)
         logd("Done combining output");
         tmpdir::remove();
     }
+    // Sort all coefficients in the canonical order.
+    sort_in_canonical_order(gbrackets, coef2uniqid);
     // Compute canonical permutations and hashes for top-level
     // sectors (those with largest number of propagators).
     hash_t *canonical_hashes = (hash_t*)shared_alloc(sizeof(hash_t) * npolynomials);
